@@ -3,21 +3,50 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/IR/IRBuilder.h"
 using namespace llvm;
 
 namespace {
+
   struct SkeletonPass : public FunctionPass {
     static char ID;
     SkeletonPass() : FunctionPass(ID) {}
 
+    struct inst {
+	    char lhs;
+	    char rhs;
+	    struct node* next;
+    };
+
+    struct inst* insts;
+
+   
     virtual bool runOnFunction(Function &F) {
       errs() << "I saw a function called " << F.getName() << "!\n";
       F.dump();
+      insts = (inst*) malloc(sizeof(struct inst));
       //return false;
       for(auto& B : F) {
-	      errs()<< "I saw a basic block\n";
 	      for(auto& I : B) {
-		      errs()<< "I saw an instruction\n";
+		      errs()<< I.getOpcode() <<"\n";
+		      if(auto* op = dyn_cast<BinaryOperator>(&I)) {
+			      /*IRBuilder<> builder(op);
+			      Value *lhs = op->getOperand(0);
+			      Value *rhs = op->getOperand(1);
+			      Value *mul = builder.CreateAdd(lhs, rhs);
+			      errs()<< *op <<"is the binary instruction\n";
+			      errs()<< *mul << " is the op built\n";
+			      errs()<< *(lhs) << "along with "<< *(rhs) << "\n";*/
+
+
+		      }
+		      if(I.getOpcode() == 30) { //load
+			      errs()<< "load found\n";
+			      errs()<< *(I.getOperand(0)) << " is the variable\n";
+		      }
+
+
+
 	      }      
       }
       
