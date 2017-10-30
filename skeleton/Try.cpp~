@@ -86,12 +86,20 @@ namespace {
 
 
 	      }
-	      inst* ptr = insts;
-	      while(ptr != NULL) {
-		      errs()<<ptr->lhs <<" + "<<ptr->rhs<<"\n";
-		      ptr = ptr->next;
+      }	
+      inst* first = insts;
+      while(first->next != NULL) {
+	      inst* check = first->next;
+	      while(check != NULL) {
+		      if(check->lhs == first->lhs && check->rhs == first->rhs) {
+			      errs()<<first->lhs <<" + "<< first->rhs << " is redundant\n";
+			      break;
+		      }
+		      check = check->next;
 	      }
-      }
+		      first = first->next;
+     }
+     
       
     }
   };
