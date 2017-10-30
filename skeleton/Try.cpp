@@ -15,26 +15,52 @@ namespace {
     struct inst {
 	    char lhs;
 	    char rhs;
-	    struct node* next;
+	    struct inst* next;
     };
 
     struct inst* insts;
 
-    getVariable(
+    //takes an alloc of the form %a = alloca .. and gets a
+   char getVariable(Instruction *I) {
+	   std::string str;
+	   llvm::raw_string_ostream rso(str);
+	   I->print(rso);
+	   char var;
+	   int i;
+	   for(i=0; str[i]!='%';i++);
+	   return str[i+1];
+   }
 
-    addToInsts(auto* op) {
-	    if(insts == NULL) {
-		    insts = new node;
-		    insts->lhs = getVariable(op->getOperand(0));
-		    insts->rhs = getVariable(op->getOperand(1));
-	    }
-    }
+   void addToInsts(Instruction *I) {
+	   //errs()<< *(I->getOperand(0)) << " is the lhs\n";
+	   Instruction *lhs = (Instruction*)I->getOperand(0); //of the form %2= load ...
+	   Instruction *rhs = (Instruction*)I->getOperand(1); //we need to get load operand
 
+	   Instruction *lvar = (Instruction*)lhs->getOperand(0); 
+	   Instruction *rvar = (Instruction*)rhs->getOperand(0);
+	   //the above is of the form %a = alloca
+	   //errs()<< *lvar << " is the left variable\n";
+	   if(insts == NULL) {
+		   insts = new inst;
+		   insts->lhs = getVariable(lvar);
+		   insts->rhs = getVariable(rvar);
+		   insts->next = NULL;
+	   }
+	   else if(insts != NULL) {
+		   inst* temp = new inst;
+		   temp->lhs = getVariable(lvar);
+		   temp->rhs = getVariable(rvar);
+		   temp->next = insts;
+		   insts = temp;
+	   }
+
+   }
+   
    
     virtual bool runOnFunction(Function &F) {
       errs() << "I saw a function called " << F.getName() << "!\n";
       F.dump();
-      insts = (inst*) malloc(sizeof(struct inst));
+      insts = NULL;
       //return false;
       for(auto& B : F) {
 	      for(auto& I : B) {
@@ -48,18 +74,31 @@ namespace {
 			      errs()<< *mul << " is the op built\n";
 			      errs()<< *(lhs) << "along with "<< *(rhs) << "\n";*/
 
-			      addToInsts(op);
 
 
+		      }
+		      if(I.getOpcode() == 11) {//add
+			      addToInsts(&I);
 		      }
 		      if(I.getOpcode() == 30) { //load
-			      errs()<< "load found\n";
-			      errs()<< *(I.getOperand(0)) << " is the variable\n";
 		      }
 
 
 
-	      }      
+	      }
+	      inst* first = insts;
+	      while(first->next != NULL) {
+		      inst* check = first->next;
+		      while(check != NULL) {
+			      if(check->lhs == first->lhs && check->rhs == first->rhs) {
+				      errs()<<first->lhs <<" + "<< first->rhs << " is redundant\n";
+				      break;
+			      }
+			      check = check->next;
+		      }
+
+		      first = first->next;
+	      }
       }
       
     }
