@@ -87,7 +87,7 @@ namespace {
 
 	      }
       }	
-      inst* first = insts;
+      /*inst* first = insts;
       while(first->next != NULL) {
 	      inst* check = first->next;
 	      while(check != NULL) {
@@ -98,7 +98,7 @@ namespace {
 		      check = check->next;
 	      }
 		      first = first->next;
-     }
+     }*/
      
       
     }
