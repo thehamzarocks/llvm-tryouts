@@ -4,6 +4,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Instruction.h"
 #include <map>
 #include <iterator>
 using namespace llvm;
@@ -17,15 +18,15 @@ namespace {
 
     struct node {
 	    Instruction *I;
-	    int available;
+	    int ant;
     };
 
     node *graph;
 
-    typedef std::map <Instruction*, int> avail;
-    avail avail_in;
-    avail avail_out;
-    avail::iterator it;
+    typedef std::map <Instruction*, int> ant;
+    ant ant_in;
+    ant ant_out;
+    ant::iterator it;
 
 
     virtual bool runOnFunction(Function &F) {
@@ -36,20 +37,20 @@ namespace {
       //return false;
       for(auto& B : F) {
 	      errs()<< "I saw a basic block\n";
-	      Instruction  *TInst = (Instruction*) B.getTerminator();
-	      //errs()<< (*TInst) << "is the terminator\n";
-	      //Instruction *I = (Instruction*) B.getFirstNonPHI();
-	      //errs()<< (*I) << "is the first instruction\n";
+        //Instruction *I = (Instruction*) B.getFirstNonPHI();
+        //errs()<< I->getOpcodeName() << " is the first instruction\n";
+	      //Instruction  *TInst = (Instruction*) B.getTerminator();
+	      //errs()<< TInst->getOpcodeName() << " is the terminator\n";
 	      for(auto& I : B) {
-		      avail_in.insert(make_pair(&I,0));
+		      ant_in.insert(make_pair(&I,0));
 	      }
-	      for (it = avail_in.begin(); it != avail_in.end(); ++it) {
-		      errs()<< it->first << " " << it->second << "\n";
+	      for (it = ant_in.begin(); it != ant_in.end(); ++it) {
+		      errs()<< it->first->getOpcodeName() << " " << it->second << "\n";
 	      }
 
       }
 
-
+      return false;
     }
   };
 }
