@@ -92,6 +92,27 @@ namespace {
 
    }
 
+    bool antloc(Instruction *i, inst *expr) {
+      if(i->getOpcode() != 11) {  //if no computation => expression not anticipated.
+    		return false;
+    	}
+
+    	Instruction *lhs = (Instruction*) i->getOperand(0);
+    	Instruction *rhs = (Instruction*) i->getOperand(1);
+
+    	Instruction *lvar = (Instruction*)lhs->getOperand(0);
+    	Instruction *rvar = (Instruction*)rhs->getOperand(0);
+
+
+    	//we've got the operands. If they match, it is locally anticipable
+    	if(expr->lhs == lvar && expr->rhs == rvar) {
+    		return true;
+    	}
+
+      return false;
+    }
+
+
    bool transp(Instruction *i, inst *expr) {
      if(i->getOpcode() != 11) {
    		return true;
@@ -119,8 +140,16 @@ namespace {
     typedef std::map <Instruction*, int> avail;
     avail avail_in;
     avail avail_out;
-    avail::iterator it;
+    //avail::iterator it;
 
+    typedef std::map <Instruction*, int> ant;
+    ant ant_in;
+    ant ant_out;
+    //ant::iterator it;
+
+    typedef std::map <Instruction*, int> safe;
+    safe safe_in;
+    safe safe_out;
 
     virtual bool runOnFunction(Function &F) {
       errs() << "I saw a function called " << F.getName() << "!\n";
@@ -149,6 +178,8 @@ namespace {
 
 	      }
       }
+
+	//Availability
 
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
 	      //BasicBlock *B = (BasicBlock*)  b;
@@ -203,6 +234,88 @@ namespace {
 	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
       }
 
+	//Anticipability
+	int c = 0;
+
+      for(Function::iterator b = F.end(); b != F.begin(); b--) {
+        BasicBlock *B = (BasicBlock*) --b;
+        b++;
+        for(BasicBlock::iterator i=B->end(); i != B->begin(); i--) {
+          Instruction *I = (Instruction*) --i;
+          i++;
+          if(c == 0) {
+            ant_out[I] = 0;
+            ant_in[I] = antloc(I, insts) || (ant_out[I] && transp(I, insts));
+            c = 1;
+          }
+
+          else if(I == (Instruction *)B->getTerminator()) {
+            ant_out[I] = 1;
+            TerminatorInst *TInst = B->getTerminator();
+            for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
+              BasicBlock *Succ = TInst->getSuccessor(x);
+              Instruction *firstInstruction = (Instruction*) Succ->begin();
+				      if(ant_in[firstInstruction] == 0) {
+					      ant_out[I] = 0;
+					      break;
+				      }
+            }
+
+			      ant_in[I] = (ant_out[I] && transp(I, insts)) || antloc(I, insts);
+          }
+
+          else {
+            BasicBlock::iterator j = i;
+
+			      ant_out[I] = ant_in[(Instruction*) (j)];
+			      ant_in[I] = (ant_out[I] && transp(I, insts)) || antloc(I, insts);
+          }
+        }
+
+      }
+
+      errs() << "Outs\n";
+
+      for(ant::iterator it = ant_out.begin(), ite=ant_out.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
+      }
+
+      errs() << "Ins\n";
+	    for(ant::iterator it = ant_in.begin(), ite=ant_in.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
+      }
+
+	//safety
+	for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+		BasicBlock *B = (BasicBlock*) b;
+		for(BasicBlock::iterator i=B->begin(),ie=B->end(); i!=ie; i++) {
+			Instruction* I = (Instruction*) i;
+			if(avail_in[I] == 0  && ant_in[I] == 0) {
+				safe_in[I] = 0;
+			}
+			else {
+				safe_in[I] = 1;
+			}
+
+			if(avail_out[I] == 0 &&  ant_out[I] == 0) {
+				safe_out[I] = 0;
+			}
+			else {
+				safe_out[I] = 1;
+			}
+		}
+	}
+
+	errs() << "Safe in and out\n";
+	for(safe::iterator it=safe_in.begin(), ite=safe_in.end(); it!=ite; it++) {
+		errs() << (*it->first) << " " << it->second << "\n";
+	}
+
+	for(safe::iterator it=safe_out.begin(), ite=safe_out.end(); it!=ite; it++) {
+		errs() << (*it->first) << " " << it->second << "\n";
+	}
+
+
 
 
 
@@ -211,6 +324,8 @@ namespace {
 
 	      //errs() << (*it->first) << " has avail_in " << it->second << "\n";
       }
+
+
 
 	      //for(BasicBlock::iterator i=b.begin(), ie=b.end(); i!=ie; i++) {
 
@@ -243,9 +358,7 @@ namespace {
       }*/
 
 
-      for (it = avail_in.begin(); it != avail_in.end(); ++it) {
-	      //errs()<< it->first << " " << it->second << "\n";
-      }
+      
 
 
 
