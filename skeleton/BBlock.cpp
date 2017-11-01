@@ -129,22 +129,12 @@ namespace {
 	      }	      
       }
 
-
-      for(avail::iterator it = avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
-	      errs() << it->first << "\n";
-      }
-
-
-
-
-
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
 	      //BasicBlock *B = (BasicBlock*)  b;
 	      //errs() << "The last instruction is " << (*--B->end()) << "\n";
 	      BasicBlock *B = (BasicBlock*) b;
 	      for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
 		      Instruction *I = (Instruction*) i;
-		      errs() << "-----" << I << "\n";
 		      if(b==F.begin() && i==B->begin()) {
 			      //errs() << I << " " << (*I) << "\n";
 			      avail_in[I] = 0;
@@ -165,14 +155,14 @@ namespace {
 		      else {
 			      //avail_in[I] = avail_out[--I];
 			      BasicBlock::iterator j = i;
-			      avail_in[I] = avail_out[(Instruction*) (j--)];
+			      avail_in[I] = avail_out[(Instruction*) (j--)]; //this is wrong. Instruction order in the map differs from the actual instruction order
 			      avail_out[I] = avail_in[I] || comp(I, insts);
 		      }
 	      }
       }
 
-      for(avail::iterator it = avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
-	      errs() << "-" <<  *(it->first) << "\n";
+      for(avail::iterator it = avail_out.begin(), ite=avail_out.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
       }
 
 
