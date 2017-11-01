@@ -154,12 +154,26 @@ namespace {
 		      }
 		      else {
 			      //avail_in[I] = avail_out[--I];
+			      /*while((Instruction*) j != I) {
+				      j++;
+			      }*/
+
 			      BasicBlock::iterator j = i;
-			      avail_in[I] = avail_out[(Instruction*) (j--)]; //this is wrong. Instruction order in the map differs from the actual instruction order
+			      j--;
+
+			      
+			      avail_in[I] = avail_out[(Instruction*) (j)]; //this is wrong. Instruction order in the map differs from the actual instruction order
 			      avail_out[I] = avail_in[I] || comp(I, insts);
 		      }
 	      }
       }
+
+      errs() << "Ins\n";
+	for(avail::iterator it = avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
+      }
+
+	errs() << "Outs\n";
 
       for(avail::iterator it = avail_out.begin(), ite=avail_out.end(); it!=ite; it++) {
 	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
