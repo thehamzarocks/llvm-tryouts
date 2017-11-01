@@ -39,7 +39,7 @@ namespace {
 	   Instruction *lhs = (Instruction*)I->getOperand(0); //of the form %2= load ...
 	   Instruction *rhs = (Instruction*)I->getOperand(1); //we need to get load operand
 
-	   Instruction *lvar = (Instruction*)lhs->getOperand(0); 
+	   Instruction *lvar = (Instruction*)lhs->getOperand(0);
 	   Instruction *rvar = (Instruction*)rhs->getOperand(0);
 	   //the above is of the form %a = alloca
 	   //errs()<< *lvar << " is the left variable\n";
@@ -81,7 +81,7 @@ namespace {
 	if(expr->lhs == lvar && expr->rhs == rvar) {
 		//check what the next instruction is storing
 		i = i->getNextNode();
-		Instruction *storedvar = (Instruction*) i->getOperand(0);
+		Instruction *storedvar = (Instruction*) i->getOperand(1);
 		if(storedvar == lvar || storedvar == rvar) {
 			return false;
 		}
@@ -90,6 +90,27 @@ namespace {
 
 
 
+   }
+
+   bool transp(Instruction *i, inst *expr) {
+     if(i->getOpcode() != 11) {
+   		return true;
+   	}
+
+
+   	Instruction *lvar = expr->lhs;
+   	Instruction *rvar = expr->rhs;
+
+
+    i = i->getNextNode();
+    //errs() << "The store is " << (*i) << "\n";
+    Instruction *storedvar = (Instruction*) i->getOperand(1);
+    //errs() << "The stored var  is " << (*storedvar) << "\n";
+    if(storedvar == lvar || storedvar == rvar) {
+      return false;
+    }
+
+    return true;
    }
 
 
@@ -118,15 +139,15 @@ namespace {
 
 		      if(I.getOpcode() == 11) {
      				addToInsts(&I);
-			}			
+			}
 
 		      avail_in.insert(make_pair(&I,0));
 		      avail_out.insert(make_pair(&I,0));
 
 		      //only the first instruction in a basic block can have multiple predecessors
 		      Instruction *inst = (Instruction*) B.getFirstNonPHI();
-		
-	      }	      
+
+	      }
       }
 
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
@@ -150,7 +171,7 @@ namespace {
 					      break;
 				      }
 			      }
-			      avail_out[I] = avail_in[I] || comp(I, insts);
+			      avail_out[I] = (avail_in[I] && transp(I, insts)) || comp(I, insts);
 		      }
 		      else {
 			      //avail_in[I] = avail_out[--I];
@@ -161,9 +182,12 @@ namespace {
 			      BasicBlock::iterator j = i;
 			      j--;
 
-			      
+
 			      avail_in[I] = avail_out[(Instruction*) (j)]; //this is wrong. Instruction order in the map differs from the actual instruction order
-			      avail_out[I] = avail_in[I] || comp(I, insts);
+			      avail_out[I] = (avail_in[I] && transp(I, insts)) || comp(I, insts);
+          /*  if(I->getOpcode()==11) {
+              errs() << (*I) << "Transp " << transp(I, insts) << "comp " << comp(I, insts)<<"\n";
+            }*/
 		      }
 	      }
       }
@@ -184,7 +208,7 @@ namespace {
 
 
       for(avail::iterator it=avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
-	      
+
 	      //errs() << (*it->first) << " has avail_in " << it->second << "\n";
       }
 
@@ -197,44 +221,44 @@ namespace {
 		      for(BasicBlock::iterator i = B.begin(), ie=B.end(); i!=ie;  ++i) {
 			      errs() << "Iterating through instructions\n";
 		      }
-		      
+
 		      Function::iterator b = F.begin();
 		      Instruction *i = (Instruction*) B.getFirstNonPHI();
 		      //the very first instruction. Available is 0 at the start
 		      if(&B == b) {
 			      avail_in[i] = 0;
 			      avail_out[i] = comp(i, ptr);
-		      	    
+
 	     		      //errs()<<*(inst->getNextNode()) << "is the second instruction\n";
 		      }
 		      while(i != NULL) {
 			      avail_in[i->getNextNode()] = avail_out[i]; //could use an iterator here?
 
-			      
+
 		      }
-		     
-		     		
+
+
 	      }
 
       }*/
-      
-      
+
+
       for (it = avail_in.begin(); it != avail_in.end(); ++it) {
 	      //errs()<< it->first << " " << it->second << "\n";
       }
 
-      
 
 
 
 
-	
-
-      
-      
 
 
-      
+
+
+
+
+
+
     }
   };
 }
