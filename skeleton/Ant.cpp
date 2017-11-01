@@ -6,6 +6,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/CFG.h"
+#include "llvm/IR/InstrTypes.h"
 #include <map>
 #include <iterator>
 using namespace llvm;
@@ -20,7 +21,7 @@ namespace {
     struct inst {
 	    Instruction *lhs;
 	    Instruction *rhs;
-	    struct inst* next, *prev;
+	    struct inst* next;
     };
 
     struct inst* insts;
@@ -50,7 +51,6 @@ namespace {
 		   insts->lhs = lvar;
 		   insts->rhs = rvar;
 		   insts->next = NULL;
-       insts->prev = NULL;
 	   }
 	   else {
 		   inst* ptr = insts;
@@ -58,7 +58,6 @@ namespace {
 			   ptr = ptr->next;
 		   }
 		   ptr->next = new inst;
-       (ptr->next)->prev = ptr;
 		   ptr = ptr->next;
 		   ptr->lhs = lvar;
 		   ptr->rhs = rvar;
@@ -90,7 +89,7 @@ namespace {
       return true;
     }
 
-    bool antloc(Instruction *i, int *expr) {
+    bool antloc(Instruction *i, inst *expr) {
       if(i->getOpcode() != 11) {  //if no computation => expression not anticipated.
     		return false;
     	}
@@ -114,17 +113,17 @@ namespace {
     virtual bool runOnFunction(Function &F) {
       errs() << "I saw a function called " << F.getName() << "!\n";
       F.dump();
+      insts = NULL;
+
       //return false;
       for(auto& B : F) {
 	      errs()<< "I saw a basic block\n";
+	      //errs()<< (*TInst) << "is the terminator\n";
+	      //Instruction *I = (Instruction*) B.getFirstNonPHI();
+	      //errs()<< (*I) << "is the first instruction\n";
+	      for(auto& I : B) {
 
-        //Instruction *I = (Instruction*) B.getFirstNonPHI();
-        //errs()<< I->getOpcodeName() << " is the first instruction\n";
-	      //Instruction  *TInst = (Instruction*) B.getTerminator();
-	      //errs()<< TInst->getOpcodeName() << " is the terminator\n";
-        for(auto& I : B) {
-
-		      if(I.getOpcode() == 11) {
+		      if(I.getOpcode() == 11) { //add operation
      				addToInsts(&I);
 			    }
 
@@ -132,14 +131,60 @@ namespace {
 		      ant_out.insert(make_pair(&I,0));
 
 		      //only the first instruction in a basic block can have multiple predecessors
-		      Instruction *inst = (Instruction*) B.getFirstNonPHI();
+		      //Instruction *inst = (Instruction*) B.getFirstNonPHI();
 
 	      }
+      }
+
+
+      int c = 0;
+
+      for(Function::iterator b = F.end(); b != F.begin(); b--) {
+        BasicBlock *B = (BasicBlock*) --b;
+        b++;
+        for(BasicBlock::iterator i=B->end(); i != B->begin(); i--) {
+          Instruction *I = (Instruction*) --i;
+          i++;
+          if(c == 0) {
+            ant_out[I] = 0;
+            ant_in[I] = antloc(I, insts) || (ant_out[I] && transp(I, insts));
+            c = 1;
+          }
+
+          else if(I == (Instruction *)B->getTerminator()) {
+            ant_out[I] = 1;
+            TerminatorInst *TInst = B->getTerminator();
+            for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
+              BasicBlock *Succ = TInst->getSuccessor(x);
+              Instruction *firstInstruction = (Instruction*) Succ->begin();
+				      if(ant_in[firstInstruction] == 0) {
+					      ant_out[I] = 0;
+					      break;
+				      }
+            }
+
+			      ant_in[I] = (ant_out[I] && transp(I, insts)) || antloc(I, insts);
+          }
+
+          else {
+            BasicBlock::iterator j = i;
+
+			      ant_out[I] = ant_in[(Instruction*) (j)];
+			      ant_in[I] = (ant_out[I] && transp(I, insts)) || antloc(I, insts);
+          }
+        }
 
       }
 
-      for (it = ant_in.begin(); it != ant_in.end(); ++it) {
-        errs()<< it->first->getOpcodeName() << " " << it->second << "\n";
+      errs() << "Outs\n";
+
+      for(ant::iterator it = ant_out.begin(), ite=ant_out.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
+      }
+
+      errs() << "Ins\n";
+	    for(ant::iterator it = ant_in.begin(), ite=ant_in.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
       }
 
       return false;

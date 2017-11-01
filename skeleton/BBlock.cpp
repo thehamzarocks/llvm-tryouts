@@ -81,7 +81,7 @@ namespace {
 	if(expr->lhs == lvar && expr->rhs == rvar) {
 		//check what the next instruction is storing
 		i = i->getNextNode();
-		Instruction *storedvar = (Instruction*) i->getOperand(0);
+		Instruction *storedvar = (Instruction*) i->getOperand(1);
 		if(storedvar == lvar || storedvar == rvar) {
 			return false;
 		}
@@ -90,6 +90,27 @@ namespace {
 
 
 
+   }
+
+   bool transp(Instruction *i, inst *expr) {
+     if(i->getOpcode() != 11) {
+   		return true;
+   	}
+
+
+   	Instruction *lvar = expr->lhs;
+   	Instruction *rvar = expr->rhs;
+
+
+    i = i->getNextNode();
+    //errs() << "The store is " << (*i) << "\n";
+    Instruction *storedvar = (Instruction*) i->getOperand(1);
+    //errs() << "The stored var  is " << (*storedvar) << "\n";
+    if(storedvar == lvar || storedvar == rvar) {
+      return false;
+    }
+
+    return true;
    }
 
 
@@ -129,22 +150,12 @@ namespace {
 	      }
       }
 
-
-      for(avail::iterator it = avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
-	      errs() << it->first << "\n";
-      }
-
-
-
-
-
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
 	      //BasicBlock *B = (BasicBlock*)  b;
 	      //errs() << "The last instruction is " << (*--B->end()) << "\n";
 	      BasicBlock *B = (BasicBlock*) b;
 	      for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
 		      Instruction *I = (Instruction*) i;
-		      errs() << "-----" << I << "\n";
 		      if(b==F.begin() && i==B->begin()) {
 			      //errs() << I << " " << (*I) << "\n";
 			      avail_in[I] = 0;
@@ -160,19 +171,36 @@ namespace {
 					      break;
 				      }
 			      }
-			      avail_out[I] = avail_in[I] || comp(I, insts);
+			      avail_out[I] = (avail_in[I] && transp(I, insts)) || comp(I, insts);
 		      }
 		      else {
 			      //avail_in[I] = avail_out[--I];
+			      /*while((Instruction*) j != I) {
+				      j++;
+			      }*/
+
 			      BasicBlock::iterator j = i;
-			      avail_in[I] = avail_out[(Instruction*) (j--)];
-			      avail_out[I] = avail_in[I] || comp(I, insts);
+			      j--;
+
+
+			      avail_in[I] = avail_out[(Instruction*) (j)]; //this is wrong. Instruction order in the map differs from the actual instruction order
+			      avail_out[I] = (avail_in[I] && transp(I, insts)) || comp(I, insts);
+          /*  if(I->getOpcode()==11) {
+              errs() << (*I) << "Transp " << transp(I, insts) << "comp " << comp(I, insts)<<"\n";
+            }*/
 		      }
 	      }
       }
 
-      for(avail::iterator it = avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
-	      errs() << "-" <<  *(it->first) << "\n";
+      errs() << "Ins\n";
+	for(avail::iterator it = avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
+      }
+
+	errs() << "Outs\n";
+
+      for(avail::iterator it = avail_out.begin(), ite=avail_out.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
       }
 
 
