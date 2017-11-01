@@ -15,8 +15,8 @@ namespace {
     SkeletonPass() : FunctionPass(ID) {}
 
     struct inst {
-	    char lhs;
-	    char rhs;
+	    Instruction *lhs;
+	    Instruction *rhs;
 	    struct inst* next;
     };
 
@@ -44,8 +44,8 @@ namespace {
 	   //errs()<< *lvar << " is the left variable\n";
 	   if(insts == NULL) {
 		   insts = new inst;
-		   insts->lhs = getVariable(lvar);
-		   insts->rhs = getVariable(rvar);
+		   insts->lhs = lvar;
+		   insts->rhs = rvar;
 		   insts->next = NULL;
 	   }
 	   else if(insts != NULL) {
@@ -55,10 +55,39 @@ namespace {
 		   }
 		   ptr->next = new inst;
 		   ptr = ptr->next;
-		   ptr->lhs = getVariable(lvar);
-		   ptr->rhs = getVariable(rvar);
+		   ptr->lhs = lvar;
+		   ptr->rhs = rvar;
 		   ptr->next = NULL;
 	   }
+
+   }
+
+   //check if the expression is computed within the node without modifying any of its operands
+
+   bool comp(Instruction *i, inst* expr) {
+	if(i->getOpcode() != 11) {
+		return false;
+	}
+
+	Instruction *lhs = (Instruction*) i->getOperand(0);
+	Instruction *rhs = (Instruction*) i->getOperand(1);
+
+	Instruction *lvar = (Instruction*)lhs->getOperand(0);
+	Instruction *rvar = (Instruction*)rhs->getOperand(0);
+
+
+	//we've got the operands. If they match, it is locally anticipable, but we need to check if they are being modified
+	if(expr->lhs == lvar && expr->rhs == rvar) {
+		//check what the next instruction is storing
+		i = i->getNextNode();
+		Instruction *storedvar = (Instruction*) i->getOperand(0);
+		if(storedvar == lvar || storedvar == rvar) {
+			return false;
+		}
+		return true;
+	}
+
+
 
    }
 
@@ -99,26 +128,58 @@ namespace {
 	      }	      
       }
 
-      for(auto& B : F) {
-	      Function::iterator b = F.begin();
-	      errs() << &B << " is the basic block and " << &B << " is what we get\n";
-	      //the very first instruction. Available is 0 at the start
-	      if(&B == b) {
-		      Instruction *inst = (Instruction*) B.getFirstNonPHI();
-		      avail_in[inst] = 0;
-		      //errs()<<*(inst->getNextNode()) << "is the second instruction\n";
+
+      for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+	      //BasicBlock *B = (BasicBlock*)  b;
+	      //errs() << "The last instruction is " << (*--B->end()) << "\n";
+	      BasicBlock *B = (BasicBlock*) b;
+	      for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
+		      Instruction *I = (Instruction*) i;
+		      if(b==F.begin() && i==B->begin()) {
+			      avail_in[I] = 0;
+			      avail_out[I] = comp(I, insts);
+		      }
 	      }
       }
-      
-      for (it = avail_in.begin(); it != avail_in.end(); ++it) {
-	      errs()<< it->first << " " << it->second << "\n";
-      }
+	      //for(BasicBlock::iterator i=b.begin(), ie=b.end(); i!=ie; i++) {
+
 
       inst* ptr = insts;
       while(ptr != NULL) {
-	      errs()<<ptr->lhs << " + " << ptr->rhs << "\n";
-	      ptr = ptr->next;
+	      for(auto& B : F) {
+		      for(BasicBlock::iterator i = B.begin(), ie=B.end(); i!=ie;  ++i) {
+			      errs() << "Iterating through instructions\n";
+		      }
+		      
+		      Function::iterator b = F.begin();
+		      Instruction *i = (Instruction*) B.getFirstNonPHI();
+		      //the very first instruction. Available is 0 at the start
+		      if(&B == b) {
+			      avail_in[i] = 0;
+			      avail_out[i] = comp(i, ptr);
+		      	    
+	     		      //errs()<<*(inst->getNextNode()) << "is the second instruction\n";
+		      }
+		      while(i != NULL) {
+			      avail_in[i->getNextNode()] = avail_out[i]; //could use an iterator here?
+
+			      
+		      }
+		     
+		     		
+	      }
+
       }
+      
+      
+      for (it = avail_in.begin(); it != avail_in.end(); ++it) {
+	      //errs()<< it->first << " " << it->second << "\n";
+      }
+
+      
+
+
+
 
 	
 

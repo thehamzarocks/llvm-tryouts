@@ -78,6 +78,9 @@ namespace {
 
 		      }
 		      if(I.getOpcode() == 11) {//add
+			      Instruction *lhs = (Instruction*) I.getOperand(0); //I is add
+			      Instruction *lload = (Instruction*) lhs->getOperand(0); //lhs is load
+			      errs() << (*lload) << " is the variable\n";
 			      addToInsts(&I);
 		      }
 		      if(I.getOpcode() == 30) { //load
