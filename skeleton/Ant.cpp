@@ -81,7 +81,7 @@ namespace {
     	Instruction *rvar = expr->rhs;
 
       i = i->getNextNode(); //see what is being modified
-      Instruction *storedvar = (Instruction*) i->getOperand(0);
+      Instruction *storedvar = (Instruction*) i->getOperand(1);
       //check if the store instruction is done on a variable of the expression
       if(storedvar == lvar || storedvar == rvar) {
         return false;
@@ -107,7 +107,7 @@ namespace {
     		return true;
     	}
 
-      return false; 
+      return false;
     }
 
 
