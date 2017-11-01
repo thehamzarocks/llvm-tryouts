@@ -36,7 +36,7 @@ namespace {
 	   Instruction *lhs = (Instruction*)I->getOperand(0); //of the form %2= load ...
 	   Instruction *rhs = (Instruction*)I->getOperand(1); //we need to get load operand
 
-	   Instruction *lvar = (Instruction*)lhs->getOperand(0); 
+	   Instruction *lvar = (Instruction*)lhs->getOperand(0);
 	   Instruction *rvar = (Instruction*)rhs->getOperand(0);
 	   //the above is of the form %a = alloca
 	   //errs()<< *lvar << " is the left variable\n";
@@ -55,8 +55,8 @@ namespace {
 	   }
 
    }
-   
-   
+
+
     virtual bool runOnFunction(Function &F) {
       errs() << "I saw a function called " << F.getName() << "!\n";
       F.dump();
@@ -78,6 +78,9 @@ namespace {
 
 		      }
 		      if(I.getOpcode() == 11) {//add
+			      Instruction *lhs = (Instruction*) I.getOperand(0); //I is add
+			      Instruction *lload = (Instruction*) lhs->getOperand(0); //lhs is load
+			      errs() << (*lload) << " is the variable\n";
 			      addToInsts(&I);
 		      }
 		      if(I.getOpcode() == 30) { //load
@@ -86,7 +89,7 @@ namespace {
 
 
 	      }
-      }	
+      }
       /*inst* first = insts;
       while(first->next != NULL) {
 	      inst* check = first->next;
@@ -99,8 +102,8 @@ namespace {
 	      }
 		      first = first->next;
      }*/
-     
-      
+
+
     }
   };
 }
