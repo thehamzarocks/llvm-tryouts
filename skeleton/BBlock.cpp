@@ -137,12 +137,14 @@ namespace {
     typedef std::map <Instruction*, int> ant;
     ant ant_in;
     ant ant_out;
-    ant::iterator it1;
 
     typedef std::map <Instruction*, int> avail;
     avail avail_in;
     avail avail_out;
-    avail::iterator it2;
+
+    typedef std::map <Instruction*, int> safe;
+    safe safe_in;
+    safe safe_out;
 
     void antPass(Function &F) {
       int c = 0;
@@ -254,6 +256,40 @@ namespace {
 
     }
 
+    void safetyPass(Function &F) {
+      for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+    		BasicBlock *B = (BasicBlock*) b;
+    		for(BasicBlock::iterator i=B->begin(),ie=B->end(); i!=ie; i++) {
+    			Instruction* I = (Instruction*) i;
+    			if(avail_in[I] == 0  && ant_in[I] == 0) {
+    				safe_in[I] = 0;
+    			}
+    			else {
+    				safe_in[I] = 1;
+    			}
+
+    			if(avail_out[I] == 0 &&  ant_out[I] == 0) {
+    				safe_out[I] = 0;
+    			}
+    			else {
+    				safe_out[I] = 1;
+    			}
+    		}
+    	}
+
+    	errs() << "\n\nSafe Ins\n";
+    	for(safe::iterator it=safe_in.begin(), ite=safe_in.end(); it!=ite; it++) {
+    		errs() << "-" << (*it->first) << "\t => " << it->second << "\n";
+    	}
+
+      errs() << "\n\nSafe Outs\n";
+
+    	for(safe::iterator it=safe_out.begin(), ite=safe_out.end(); it!=ite; it++) {
+    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
+    	}
+
+    }
+
 
     virtual bool runOnFunction(Function &F) {
       errs() << "I saw a function called " << F.getName() << "!\n";
@@ -278,6 +314,8 @@ namespace {
 		      avail_out.insert(make_pair(&I,0));
           ant_in.insert(make_pair(&I,0));
 		      ant_out.insert(make_pair(&I,0));
+          safe_in.insert(make_pair(&I,0));
+		      safe_out.insert(make_pair(&I,0));
 
 		      //only the first instruction in a basic block can have multiple predecessors
 		      Instruction *inst = (Instruction*) B.getFirstNonPHI();
@@ -287,6 +325,7 @@ namespace {
 
       availPass(F);
       antPass(F);
+      safetyPass(F);
 
       return false;
 
