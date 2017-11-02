@@ -146,7 +146,10 @@ namespace {
     spant spant_out;
 
     list<Instruction*> insertnodes;
-    list<Instruction*> insertedges;
+
+    typedef std::map<Instruction*, Instruction*> edge;
+    edge insertedges;
+
     list<Instruction*> replacenodes;
 
     void antPass(Function &F) {
@@ -474,12 +477,33 @@ namespace {
 				Instruction *I = (Instruction*) i;
 				
 				if(I == B->getTerminator()) {
-					
+				     TerminatorInst *TInst = B->getTerminator();			     
+			            for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
+				                BasicBlock *Succ = TInst->getSuccessor(x);
+			              	        Instruction *J = (Instruction*) Succ->begin();
+						if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
+							insertedges[I] = J;
+							insertedges[I] = J;
+						}
+					}
+				}
+
+				else {
+					Instruction* J = (Instruction*) ++i;
+					if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
+						insertedges[I] = J;
+					}
 				}
 			}
 		}
 
-
+		errs() << "The edges to be considered for insertion are those between\n";
+		for(edge::iterator i=insertedges.begin(), ie=insertedges.end(); i!=ie; i++) {
+			errs() << *(i->first) << " and " << *(i->second) << "\n";
+		}
+		/*for(list<Instruction*, Instruction*>::iterator i=insertedges.begin(); i!=insertedges.end(); i++) {
+			errs() << *(i->first) << " and " << *(i->second) << "\n";
+		}*/
 	}
 
 	void calculateReplaceNodes(Function &F) {
@@ -487,7 +511,6 @@ namespace {
 			BasicBlock *B = (BasicBlock*) b;
 			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
 				Instruction *I = (Instruction*) i;
-
 				if ((antloc(I, insts) && spav_in[I]) || (comp(I, insts) && spant_out[I]))   {
 					replacenodes.push_back(I);
 				}					
@@ -541,6 +564,7 @@ namespace {
       spavPass(F);
       spantPass(F);
       calculateInsertNodes(F);
+      calculateInsertEdges(F);
       calculateReplaceNodes(F);
       return false;
 
