@@ -113,43 +113,92 @@ namespace {
     return true;
    }
 
+   bool antloc(Instruction *i, inst *expr) {
+     if(i->getOpcode() != 11) {  //if no computation => expression not anticipated.
+       return false;
+     }
+
+     Instruction *lhs = (Instruction*) i->getOperand(0);
+     Instruction *rhs = (Instruction*) i->getOperand(1);
+
+     Instruction *lvar = (Instruction*)lhs->getOperand(0);
+     Instruction *rvar = (Instruction*)rhs->getOperand(0);
 
 
+     //we've got the operands. If they match, it is locally anticipable
+     if(expr->lhs == lvar && expr->rhs == rvar) {
+       return true;
+     }
+
+     return false;
+   }
+
+
+    typedef std::map <Instruction*, int> ant;
+    ant ant_in;
+    ant ant_out;
+    ant::iterator it1;
 
     typedef std::map <Instruction*, int> avail;
     avail avail_in;
     avail avail_out;
-    avail::iterator it;
+    avail::iterator it2;
 
+    void antPass(Function &F) {
+      int c = 0;
 
-    virtual bool runOnFunction(Function &F) {
-      errs() << "I saw a function called " << F.getName() << "!\n";
-      F.dump();
-      insts = NULL;
+      for(Function::iterator b = F.end(); b != F.begin(); b--) {
+        BasicBlock *B = (BasicBlock*) --b;
+        b++;
+        for(BasicBlock::iterator i=B->end(); i != B->begin(); i--) {
+          Instruction *I = (Instruction*) --i;
+          i++;
+          if(c == 0) {
+            ant_out[I] = 0;
+            ant_in[I] = antloc(I, insts) || (ant_out[I] && transp(I, insts));
+            c = 1;
+          }
 
-      Instruction *adder = NULL;
-      //return false;
-      for(auto& B : F) {
-	      errs()<< "I saw a basic block\n";
-	      Instruction  *TInst = (Instruction*) B.getTerminator();
-	      //errs()<< (*TInst) << "is the terminator\n";
-	      //Instruction *I = (Instruction*) B.getFirstNonPHI();
-	      //errs()<< (*I) << "is the first instruction\n";
-	      for(auto& I : B) {
+          else if(I == (Instruction *)B->getTerminator()) {
+            ant_out[I] = 1;
+            TerminatorInst *TInst = B->getTerminator();
+            for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
+              BasicBlock *Succ = TInst->getSuccessor(x);
+              Instruction *firstInstruction = (Instruction*) Succ->begin();
+				      if(ant_in[firstInstruction] == 0) {
+					      ant_out[I] = 0;
+					      break;
+				      }
+            }
 
-		      if(I.getOpcode() == 11) {
-     				addToInsts(&I);
-			}
+			      ant_in[I] = (ant_out[I] && transp(I, insts)) || antloc(I, insts);
+          }
 
-		      avail_in.insert(make_pair(&I,0));
-		      avail_out.insert(make_pair(&I,0));
+          else {
+            BasicBlock::iterator j = i;
 
-		      //only the first instruction in a basic block can have multiple predecessors
-		      Instruction *inst = (Instruction*) B.getFirstNonPHI();
+			      ant_out[I] = ant_in[(Instruction*) (j)];
+			      ant_in[I] = (ant_out[I] && transp(I, insts)) || antloc(I, insts);
+          }
+        }
 
-	      }
       }
 
+      errs() << "\n\nAnt Ins\n";
+	    for(ant::iterator it = ant_in.begin(), ite=ant_in.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << "\t => " << it->second <<  "\n";
+      }
+
+      errs() << "\nAnt Outs\n";
+
+      for(ant::iterator it = ant_out.begin(), ite=ant_out.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << "\t => " << it->second <<  "\n";
+      }
+
+    }
+
+
+    void availPass(Function &F) {
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
 	      //BasicBlock *B = (BasicBlock*)  b;
 	      //errs() << "The last instruction is " << (*--B->end()) << "\n";
@@ -192,72 +241,54 @@ namespace {
 	      }
       }
 
-      errs() << "Ins\n";
-	for(avail::iterator it = avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
-	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
+      errs() << "\n\nAvail Ins\n";
+	    for(avail::iterator it = avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
+	      errs() << "-" <<  *(it->first)  << "\t => " << it->second <<  "\n";
       }
 
-	errs() << "Outs\n";
+	    errs() << "\nAvail Outs\n";
 
       for(avail::iterator it = avail_out.begin(), ite=avail_out.end(); it!=ite; it++) {
-	      errs() << "-" <<  *(it->first)  << " " << it->second <<  "\n";
+	      errs() << "-" <<  *(it->first)  << "\t => " << it->second <<  "\n";
       }
 
+    }
 
 
+    virtual bool runOnFunction(Function &F) {
+      errs() << "I saw a function called " << F.getName() << "!\n";
+      F.dump();
+      insts = NULL;
 
+      Instruction *adder = NULL;
+      //return false;
+      for(auto& B : F) {
+	      errs()<< "I saw a basic block\n";
+	      Instruction  *TInst = (Instruction*) B.getTerminator();
+	      //errs()<< (*TInst) << "is the terminator\n";
+	      //Instruction *I = (Instruction*) B.getFirstNonPHI();
+	      //errs()<< (*I) << "is the first instruction\n";
+	      for(auto& I : B) {
 
-      for(avail::iterator it=avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
+		      if(I.getOpcode() == 11) {
+     				addToInsts(&I);
+			}
 
-	      //errs() << (*it->first) << " has avail_in " << it->second << "\n";
-      }
+		      avail_in.insert(make_pair(&I,0));
+		      avail_out.insert(make_pair(&I,0));
+          ant_in.insert(make_pair(&I,0));
+		      ant_out.insert(make_pair(&I,0));
 
-	      //for(BasicBlock::iterator i=b.begin(), ie=b.end(); i!=ie; i++) {
-
-
-      /*inst* ptr = insts;
-      while(ptr != NULL) {
-	      for(auto& B : F) {
-		      for(BasicBlock::iterator i = B.begin(), ie=B.end(); i!=ie;  ++i) {
-			      errs() << "Iterating through instructions\n";
-		      }
-
-		      Function::iterator b = F.begin();
-		      Instruction *i = (Instruction*) B.getFirstNonPHI();
-		      //the very first instruction. Available is 0 at the start
-		      if(&B == b) {
-			      avail_in[i] = 0;
-			      avail_out[i] = comp(i, ptr);
-
-	     		      //errs()<<*(inst->getNextNode()) << "is the second instruction\n";
-		      }
-		      while(i != NULL) {
-			      avail_in[i->getNextNode()] = avail_out[i]; //could use an iterator here?
-
-
-		      }
-
+		      //only the first instruction in a basic block can have multiple predecessors
+		      Instruction *inst = (Instruction*) B.getFirstNonPHI();
 
 	      }
-
-      }*/
-
-
-      for (it = avail_in.begin(); it != avail_in.end(); ++it) {
-	      //errs()<< it->first << " " << it->second << "\n";
       }
 
+      availPass(F);
+      antPass(F);
 
-
-
-
-
-
-
-
-
-
-
+      return false;
 
     }
   };
