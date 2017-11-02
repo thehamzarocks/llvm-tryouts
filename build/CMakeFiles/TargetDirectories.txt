@@ -1,0 +1,5 @@
+/home/ssladmin/Downloads/llvm-tryouts/build/CMakeFiles/edit_cache.dir
+/home/ssladmin/Downloads/llvm-tryouts/build/CMakeFiles/rebuild_cache.dir
+/home/ssladmin/Downloads/llvm-tryouts/build/skeleton/CMakeFiles/edit_cache.dir
+/home/ssladmin/Downloads/llvm-tryouts/build/skeleton/CMakeFiles/rebuild_cache.dir
+/home/ssladmin/Downloads/llvm-tryouts/build/skeleton/CMakeFiles/SkeletonPass.dir
