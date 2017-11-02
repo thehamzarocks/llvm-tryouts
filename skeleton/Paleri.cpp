@@ -147,7 +147,7 @@ namespace {
 
     list<Instruction*> insertnodes;
     list<Instruction*> insertedges;
-    list<Instruction*> replacepoints;
+    list<Instruction*> replacenodes;
 
     void antPass(Function &F) {
       int c = 0;
@@ -467,6 +467,26 @@ namespace {
 		}
 	}
 
+	void calculateReplaceNodes(Function &F) {
+		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+			BasicBlock *B = (BasicBlock*) b;
+			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
+				Instruction *I = (Instruction*) i;
+
+				if ((antloc(I, insts) && spav_in[I]) || (comp(I, insts) && spant_out[I]))   {
+					replacenodes.push_back(I);
+				}					
+			}
+		}
+
+		errs() << "The points of replcaement are:\n";
+		for(list<Instruction*>::iterator i = replacenodes.begin(); i != replacenodes.end(); i++) {
+			errs() << (**i) << "\n";
+		}
+	}
+	
+
+
 
     virtual bool runOnFunction(Function &F) {
       errs() << "I saw a function called " << F.getName() << "!\n";
@@ -506,7 +526,7 @@ namespace {
       spavPass(F);
       spantPass(F);
       calculateInsertNodes(F);
-
+      calculateReplaceNodes(F);
       return false;
 
     }
