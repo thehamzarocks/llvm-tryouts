@@ -467,6 +467,21 @@ namespace {
 		}
 	}
 
+	void calculateInsertEdges(Function &F) {
+		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+			BasicBlock *B = (BasicBlock*) b;
+			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
+				Instruction *I = (Instruction*) i;
+				
+				if(I == B->getTerminator()) {
+					
+				}
+			}
+		}
+
+
+	}
+
 	void calculateReplaceNodes(Function &F) {
 		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
 			BasicBlock *B = (BasicBlock*) b;

@@ -2,6 +2,7 @@
 
 int main() {
 	int a = 5;
+ 	a = 7;
 	int b = 10;
 	int c = a + b;
 	if(a>b) {
