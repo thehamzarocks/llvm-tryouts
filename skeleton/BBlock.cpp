@@ -8,6 +8,7 @@
 #include "llvm/IR/Instruction.h"
 #include <map>
 #include <iterator>
+#include <list>
 using namespace llvm;
 using namespace std;
 
@@ -162,6 +163,13 @@ namespace {
 
     typedef std::map <int, Instruction*> numInstr;
     numInstr numToInstr;
+
+    list<Instruction*> insertnodes;
+
+    typedef std::map<Instruction*, Instruction*> edge;
+    edge insertedges;
+
+    list<Instruction*> replacenodes;
 
 
     void antPass(Function &F, inst *expr) {
@@ -404,6 +412,65 @@ namespace {
 
     }
 
+  void calculateInsertNodes(Function &F, inst *expr) {
+		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+			BasicBlock *B = (BasicBlock*) b;
+			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
+				Instruction *I = (Instruction*) i;
+
+				if(comp(I, expr) && !(spav_in[I]) && spant_out[I]) {
+					insertnodes.push_back(I);
+				}
+			}
+		}
+
+	 }
+
+	 void calculateInsertEdges(Function &F, inst *expr) {
+  		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+  			BasicBlock *B = (BasicBlock*) b;
+  			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
+  				Instruction *I = (Instruction*) i;
+
+  				if(I == B->getTerminator()) {
+  				     TerminatorInst *TInst = B->getTerminator();
+  			            for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
+  				                BasicBlock *Succ = TInst->getSuccessor(x);
+  			              	        Instruction *J = (Instruction*) Succ->begin();
+  						if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
+  							insertedges[I] = J;
+  							insertedges[I] = J;
+  						}
+  					}
+  				}
+
+  				else {
+  					Instruction* J = (Instruction*) ++i;
+  					if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
+  						insertedges[I] = J;
+  					}
+  				}
+  			}
+  		}
+
+  		/*for(list<Instruction*, Instruction*>::iterator i=insertedges.begin(); i!=insertedges.end(); i++) {
+  			errs() << *(i->first) << " and " << *(i->second) << "\n";
+  		}*/
+	 }
+
+	void calculateReplaceNodes(Function &F, inst *expr) {
+		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+			BasicBlock *B = (BasicBlock*) b;
+			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
+				Instruction *I = (Instruction*) i;
+				if ((antloc(I, expr) && spav_in[I]) || (comp(I, expr) && spant_out[I]))   {
+					replacenodes.push_back(I);
+				}
+			}
+		}
+
+  }
+
     void showResults(inst *expr) {
       errs() << "\n\n\nExpression : " << getVariable(expr->lhs) << " + " << getVariable(expr->rhs) << "\n";
       errs() << "\nOrder : AVIN, AVOUT, ANTIN, ANTOUT, SAFEIN, SAFEOUT, SPAVIN, SPAVOUT, SPANTIN, SPANTOUT\n\n";
@@ -413,6 +480,21 @@ namespace {
         errs() << "-" << *I << "\t=> " << avail_in[I] << " " << avail_out[I] << " " << ant_in[I] << " " << ant_out[I] << " " << safe_in[I] << " " << safe_out[I] << " " << spav_in[I] << " "
         << spav_out[I] << " " << spant_in[I] << " " << spant_out[I] << "\n\n";
       }
+
+      errs() << "\nThe points of insertion are:\n";
+  		for(list<Instruction*>::iterator i = insertnodes.begin(); i != insertnodes.end(); i++) {
+  			errs() << (**i) << "\n";
+  		}
+
+      errs() << "\nThe edges to be considered for insertion are those between\n";
+  		for(edge::iterator i=insertedges.begin(), ie=insertedges.end(); i!=ie; i++) {
+  			errs() << *(i->first) << " and " << *(i->second) << "\n";
+  		}
+
+      errs() << "\nThe points of replacement are:\n";
+  		for(list<Instruction*>::iterator i = replacenodes.begin(); i != replacenodes.end(); i++) {
+  			errs() << (**i) << "\n";
+  		}
 
     }
 
@@ -481,6 +563,9 @@ namespace {
         safetyPass(F, expr);
         spavPass(F, expr);
         spantPass(F, expr);
+        calculateInsertNodes(F, expr);
+        calculateInsertEdges(F, expr);
+        calculateReplaceNodes(F, expr);
 
         showResults(expr);
 
