@@ -23,16 +23,6 @@ namespace {
 
     struct inst* insts;
 
-    //takes an alloc of the form %a = alloca .. and gets a
-   char getVariable(Instruction *I) {
-	   std::string str;
-	   llvm::raw_string_ostream rso(str);
-	   I->print(rso);
-	   char var;
-	   int i;
-	   for(i=0; str[i]!='%';i++);
-	   return str[i+1];
-   }
 
    void addToInsts(Instruction *I) {
 	   //errs()<< *(I->getOperand(0)) << " is the lhs\n";
@@ -146,6 +136,14 @@ namespace {
     safe safe_in;
     safe safe_out;
 
+    typedef std::map <Instruction*, int> spav;
+    spav spav_in;
+    spav spav_out;
+
+    typedef std::map <Instruction*, int> spant;
+    spant spant_in;
+    spant spant_out;
+
     void antPass(Function &F) {
       int c = 0;
 
@@ -234,7 +232,7 @@ namespace {
 			      j--;
 
 
-			      avail_in[I] = avail_out[(Instruction*) (j)]; //this is wrong. Instruction order in the map differs from the actual instruction order
+			      avail_in[I] = avail_out[(Instruction*) (j)];
 			      avail_out[I] = (avail_in[I] && transp(I, insts)) || comp(I, insts);
           /*  if(I->getOpcode()==11) {
               errs() << (*I) << "Transp " << transp(I, insts) << "comp " << comp(I, insts)<<"\n";
@@ -290,6 +288,162 @@ namespace {
 
     }
 
+    void spavPass(Function &F) {
+      for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+	      //BasicBlock *B = (BasicBlock*)  b;
+	      //errs() << "The last instruction is " << (*--B->end()) << "\n";
+	      BasicBlock *B = (BasicBlock*) b;
+	      for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
+		      Instruction *I = (Instruction*) i;
+		      if(b==F.begin() && i==B->begin()) {
+			      //errs() << I << " " << (*I) << "\n";
+
+			      spav_in[I] = 0;
+
+			      if(safe_out[I] == 0) {
+				      spav_out[I] = 0;
+			      }
+			      else {
+				      spav_out[I] = comp(I, insts) || (spav_in[I] && transp(I, insts));
+			      }
+
+		      }
+		      else if(i==B->begin() && b!=F.begin()) {
+
+			      if(safe_in[I] == 0) {
+				      spav_in[I] = 0;
+			      }
+			      else {
+				      spav_in[I] = 0;
+				      for(auto it=pred_begin(B), et=pred_end(B); it!=et; ++it) {
+					      BasicBlock *predecessor = *it;
+					      Instruction *lastInstruction = (Instruction*) (--predecessor->end());
+					      if(avail_out[lastInstruction] == 1) {
+						      spav_in[I] = 1;
+						      break;
+					      }
+				      }
+			      }
+
+			      if(safe_out[I] == 0) {
+				      spav_out[I] = 0;
+			      }
+			      else {
+				      spav_out[I] = comp(I, insts) || (spav_in[I] && transp(I, insts));
+			      }
+		      }
+		      else {
+			      //avail_in[I] = avail_out[--I];
+			      /*while((Instruction*) j != I) {
+				      j++;
+			      }*/
+
+			      if(safe_in[I] == 0) {
+				      spav_in[I] = 0;
+			      }
+			      else {
+				      BasicBlock::iterator j = i;
+				      j--;
+				      spav_in[I] = spav_out[(Instruction*) j];
+			      }
+
+			      if(safe_out[I] == 0) {
+				      spav_out[I] = 0;
+			      }
+			      else {
+				      spav_out[I] = comp(I, insts) || (spav_in[I] && transp(I, insts));
+			      }
+
+		      }
+	      }
+      }
+
+    	//spav in
+    	//
+    	errs() << "spav in\n";
+    	for(safe::iterator it=spav_in.begin(), ite=spav_in.end(); it!=ite; it++) {
+    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
+    	}
+
+    	//spav out
+    	//
+    	errs() << "spav out\n";
+
+    	for(safe::iterator it=spav_out.begin(), ite=spav_out.end(); it!=ite; it++) {
+    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
+      }
+    }
+
+    void spantPass(Function &F) {
+
+      int c=0;
+
+      for(Function::iterator b = F.end(); b != F.begin(); b--) {
+        BasicBlock *B = (BasicBlock*) --b;
+        b++;
+        for(BasicBlock::iterator i=B->end(); i != B->begin(); i--) {
+          Instruction *I = (Instruction*) --i;
+          i++;
+          if(c == 0) {
+            spant_out[I] = 0;
+
+            spant_in[I] = (antloc(I, insts) || (spant_out[I] && transp(I, insts))) && (safe_in[I]);
+            c = 1;
+          }
+
+          else if(I == (Instruction *)B->getTerminator()) {
+            spant_out[I] = 0;
+            TerminatorInst *TInst = B->getTerminator();
+            for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
+              BasicBlock *Succ = TInst->getSuccessor(x);
+              Instruction *firstInstruction = (Instruction*) Succ->begin();
+              if(spant_in[firstInstruction] == 1) {
+                spant_out[I] = 1;
+                break;
+              }
+            }
+            if(!safe_out[I])  {
+              spant_out[I] = 0;
+            }
+            spant_in[I] = (spant_out[I] && transp(I, insts)) || antloc(I, insts);
+            if(!safe_in[I])  {
+              spant_in[I] = 0;
+            }
+          }
+
+          else {
+            BasicBlock::iterator j = i;
+
+            spant_out[I] = spant_in[(Instruction*) (j)];
+            if(!safe_out[I])  {
+              spant_out[I] = 0;
+            }
+            spant_in[I] = (spant_out[I] && transp(I, insts)) || antloc(I, insts);
+            if(!safe_in[I])  {
+              spant_in[I] = 0;
+            }
+
+          }
+        }
+
+      }
+
+      errs() << "\n\nspant in\n";
+    	for(safe::iterator it=spant_in.begin(), ite=spant_in.end(); it!=ite; it++) {
+    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
+    	}
+
+    	//spav out
+    	//
+    	errs() << "spant out\n";
+
+    	for(safe::iterator it=spant_out.begin(), ite=spant_out.end(); it!=ite; it++) {
+    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
+      }
+
+
+    }
+
 
     virtual bool runOnFunction(Function &F) {
       errs() << "I saw a function called " << F.getName() << "!\n";
@@ -326,6 +480,8 @@ namespace {
       availPass(F);
       antPass(F);
       safetyPass(F);
+      spavPass(F);
+      spantPass(F);
 
       return false;
 
