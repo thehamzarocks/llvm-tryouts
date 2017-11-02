@@ -5,6 +5,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
+#include "llvm/IR/Instruction.h"
 #include <map>
 #include <iterator>
 using namespace llvm;
@@ -16,12 +17,25 @@ namespace {
     SkeletonPass() : FunctionPass(ID) {}
 
     struct inst {
+      Instruction *instruction;
 	    Instruction *lhs;
 	    Instruction *rhs;
 	    struct inst* next;
     };
 
     struct inst* insts;
+
+    //takes an alloc of the form %a = alloca .. and gets a
+    char getVariable(Instruction *I) {
+  	   std::string str;
+  	   llvm::raw_string_ostream rso(str);
+  	   I->print(rso);
+  	   char var;
+  	   int i;
+  	   for(i=0; str[i]!='%';i++);
+  	   return str[i+1];
+    }
+
 
 
    void addToInsts(Instruction *I) {
@@ -35,6 +49,7 @@ namespace {
 	   //errs()<< *lvar << " is the left variable\n";
 	   if(insts == NULL) {
 		   insts = new inst;
+       insts->instruction = I;
 		   insts->lhs = lvar;
 		   insts->rhs = rvar;
 		   insts->next = NULL;
@@ -46,6 +61,7 @@ namespace {
 		   }
 		   ptr->next = new inst;
 		   ptr = ptr->next;
+       ptr->instruction = I;
 		   ptr->lhs = lvar;
 		   ptr->rhs = rvar;
 		   ptr->next = NULL;
@@ -144,7 +160,11 @@ namespace {
     spant spant_in;
     spant spant_out;
 
-    void antPass(Function &F) {
+    typedef std::map <int, Instruction*> numInstr;
+    numInstr numToInstr;
+
+
+    void antPass(Function &F, inst *expr) {
       int c = 0;
 
       for(Function::iterator b = F.end(); b != F.begin(); b--) {
@@ -155,7 +175,7 @@ namespace {
           i++;
           if(c == 0) {
             ant_out[I] = 0;
-            ant_in[I] = antloc(I, insts) || (ant_out[I] && transp(I, insts));
+            ant_in[I] = antloc(I, expr) || (ant_out[I] && transp(I, expr));
             c = 1;
           }
 
@@ -171,34 +191,23 @@ namespace {
 				      }
             }
 
-			      ant_in[I] = (ant_out[I] && transp(I, insts)) || antloc(I, insts);
+			      ant_in[I] = (ant_out[I] && transp(I, expr)) || antloc(I, expr);
           }
 
           else {
             BasicBlock::iterator j = i;
 
 			      ant_out[I] = ant_in[(Instruction*) (j)];
-			      ant_in[I] = (ant_out[I] && transp(I, insts)) || antloc(I, insts);
+			      ant_in[I] = (ant_out[I] && transp(I, expr)) || antloc(I, expr);
           }
         }
 
       }
 
-      errs() << "\n\nAnt Ins\n";
-	    for(ant::iterator it = ant_in.begin(), ite=ant_in.end(); it!=ite; it++) {
-	      errs() << "-" <<  *(it->first)  << "\t => " << it->second <<  "\n";
-      }
-
-      errs() << "\nAnt Outs\n";
-
-      for(ant::iterator it = ant_out.begin(), ite=ant_out.end(); it!=ite; it++) {
-	      errs() << "-" <<  *(it->first)  << "\t => " << it->second <<  "\n";
-      }
-
     }
 
 
-    void availPass(Function &F) {
+    void availPass(Function &F, inst *expr) {
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
 	      //BasicBlock *B = (BasicBlock*)  b;
 	      //errs() << "The last instruction is " << (*--B->end()) << "\n";
@@ -208,7 +217,7 @@ namespace {
 		      if(b==F.begin() && i==B->begin()) {
 			      //errs() << I << " " << (*I) << "\n";
 			      avail_in[I] = 0;
-			      avail_out[I] = comp(I, insts);
+			      avail_out[I] = comp(I, expr);
 		      }
 		      else if(i==B->begin() && b!=F.begin()) {
 			      avail_in[I] = 1;
@@ -220,7 +229,7 @@ namespace {
 					      break;
 				      }
 			      }
-			      avail_out[I] = (avail_in[I] && transp(I, insts)) || comp(I, insts);
+			      avail_out[I] = (avail_in[I] && transp(I, expr)) || comp(I, expr);
 		      }
 		      else {
 			      //avail_in[I] = avail_out[--I];
@@ -233,7 +242,7 @@ namespace {
 
 
 			      avail_in[I] = avail_out[(Instruction*) (j)];
-			      avail_out[I] = (avail_in[I] && transp(I, insts)) || comp(I, insts);
+			      avail_out[I] = (avail_in[I] && transp(I, expr)) || comp(I, expr);
           /*  if(I->getOpcode()==11) {
               errs() << (*I) << "Transp " << transp(I, insts) << "comp " << comp(I, insts)<<"\n";
             }*/
@@ -241,20 +250,9 @@ namespace {
 	      }
       }
 
-      errs() << "\n\nAvail Ins\n";
-	    for(avail::iterator it = avail_in.begin(), ite=avail_in.end(); it!=ite; it++) {
-	      errs() << "-" <<  *(it->first)  << "\t => " << it->second <<  "\n";
-      }
-
-	    errs() << "\nAvail Outs\n";
-
-      for(avail::iterator it = avail_out.begin(), ite=avail_out.end(); it!=ite; it++) {
-	      errs() << "-" <<  *(it->first)  << "\t => " << it->second <<  "\n";
-      }
-
     }
 
-    void safetyPass(Function &F) {
+    void safetyPass(Function &F, inst *expr) {
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
     		BasicBlock *B = (BasicBlock*) b;
     		for(BasicBlock::iterator i=B->begin(),ie=B->end(); i!=ie; i++) {
@@ -275,20 +273,9 @@ namespace {
     		}
     	}
 
-    	errs() << "\n\nSafe Ins\n";
-    	for(safe::iterator it=safe_in.begin(), ite=safe_in.end(); it!=ite; it++) {
-    		errs() << "-" << (*it->first) << "\t => " << it->second << "\n";
-    	}
-
-      errs() << "\n\nSafe Outs\n";
-
-    	for(safe::iterator it=safe_out.begin(), ite=safe_out.end(); it!=ite; it++) {
-    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
-    	}
-
     }
 
-    void spavPass(Function &F) {
+    void spavPass(Function &F, inst *expr) {
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
 	      //BasicBlock *B = (BasicBlock*)  b;
 	      //errs() << "The last instruction is " << (*--B->end()) << "\n";
@@ -304,7 +291,7 @@ namespace {
 				      spav_out[I] = 0;
 			      }
 			      else {
-				      spav_out[I] = comp(I, insts) || (spav_in[I] && transp(I, insts));
+				      spav_out[I] = comp(I, expr) || (spav_in[I] && transp(I, expr));
 			      }
 
 		      }
@@ -329,7 +316,7 @@ namespace {
 				      spav_out[I] = 0;
 			      }
 			      else {
-				      spav_out[I] = comp(I, insts) || (spav_in[I] && transp(I, insts));
+				      spav_out[I] = comp(I, expr) || (spav_in[I] && transp(I, expr));
 			      }
 		      }
 		      else {
@@ -351,30 +338,16 @@ namespace {
 				      spav_out[I] = 0;
 			      }
 			      else {
-				      spav_out[I] = comp(I, insts) || (spav_in[I] && transp(I, insts));
+				      spav_out[I] = comp(I, expr) || (spav_in[I] && transp(I, expr));
 			      }
 
 		      }
 	      }
       }
 
-    	//spav in
-    	//
-    	errs() << "spav in\n";
-    	for(safe::iterator it=spav_in.begin(), ite=spav_in.end(); it!=ite; it++) {
-    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
-    	}
-
-    	//spav out
-    	//
-    	errs() << "spav out\n";
-
-    	for(safe::iterator it=spav_out.begin(), ite=spav_out.end(); it!=ite; it++) {
-    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
-      }
     }
 
-    void spantPass(Function &F) {
+    void spantPass(Function &F, inst *expr) {
 
       int c=0;
 
@@ -387,7 +360,7 @@ namespace {
           if(c == 0) {
             spant_out[I] = 0;
 
-            spant_in[I] = (antloc(I, insts) || (spant_out[I] && transp(I, insts))) && (safe_in[I]);
+            spant_in[I] = (antloc(I, expr) || (spant_out[I] && transp(I, expr))) && (safe_in[I]);
             c = 1;
           }
 
@@ -405,7 +378,7 @@ namespace {
             if(!safe_out[I])  {
               spant_out[I] = 0;
             }
-            spant_in[I] = (spant_out[I] && transp(I, insts)) || antloc(I, insts);
+            spant_in[I] = (spant_out[I] && transp(I, expr)) || antloc(I, expr);
             if(!safe_in[I])  {
               spant_in[I] = 0;
             }
@@ -418,7 +391,7 @@ namespace {
             if(!safe_out[I])  {
               spant_out[I] = 0;
             }
-            spant_in[I] = (spant_out[I] && transp(I, insts)) || antloc(I, insts);
+            spant_in[I] = (spant_out[I] && transp(I, expr)) || antloc(I, expr);
             if(!safe_in[I])  {
               spant_in[I] = 0;
             }
@@ -428,19 +401,18 @@ namespace {
 
       }
 
-      errs() << "\n\nspant in\n";
-    	for(safe::iterator it=spant_in.begin(), ite=spant_in.end(); it!=ite; it++) {
-    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
-    	}
 
-    	//spav out
-    	//
-    	errs() << "spant out\n";
+    }
 
-    	for(safe::iterator it=spant_out.begin(), ite=spant_out.end(); it!=ite; it++) {
-    		errs() <<"-" << (*it->first) << "\t => " << it->second << "\n";
+    void showResults(inst *expr) {
+      errs() << "\n\n\nExpression : " << getVariable(expr->lhs) << " + " << getVariable(expr->rhs) << "\n";
+      errs() << "\nOrder : AVIN, AVOUT, ANTIN, ANTOUT, SAFEIN, SAFEOUT, SPAVIN, SPAVOUT, SPANTIN, SPANTOUT\n\n";
+      for(numInstr::iterator it = numToInstr.begin(), ite = numToInstr.end(); it != ite; it++) {
+        Instruction *I;
+        I = it->second;
+        errs() << "-" << *I << "\t=> " << avail_in[I] << " " << avail_out[I] << " " << ant_in[I] << " " << ant_out[I] << " " << safe_in[I] << " " << safe_out[I] << " " << spav_in[I] << " "
+        << spav_out[I] << " " << spant_in[I] << " " << spant_out[I] << "\n\n";
       }
-
 
     }
 
@@ -450,8 +422,8 @@ namespace {
       F.dump();
       insts = NULL;
 
-      Instruction *adder = NULL;
-      //return false;
+      int num = 0;
+
       for(auto& B : F) {
 	      errs()<< "I saw a basic block\n";
 	      Instruction  *TInst = (Instruction*) B.getTerminator();
@@ -461,8 +433,31 @@ namespace {
 	      for(auto& I : B) {
 
 		      if(I.getOpcode() == 11) {
-     				addToInsts(&I);
-			}
+            inst *expr;
+            expr = insts;
+            int c = 0;
+                  //checking duplicates and commutativity
+            while(expr != NULL) {
+
+              Instruction *lhsTest = (Instruction*)I.getOperand(0);
+              Instruction *rhsTest = (Instruction*)I.getOperand(1);
+
+              Instruction *lvarTest = (Instruction*)lhsTest->getOperand(0);
+              Instruction *rvarTest = (Instruction*)rhsTest->getOperand(0);
+              if((lvarTest==expr->lhs&&rvarTest==expr->rhs)||(rvarTest==expr->lhs&&lvarTest==expr->rhs)) {
+                c = 1;
+              }
+              expr = expr->next;
+            }
+
+            if(c == 0) {
+              addToInsts(&I);
+            }
+
+			    }
+
+          numToInstr.insert(make_pair(num,&I));
+          num++;
 
 		      avail_in.insert(make_pair(&I,0));
 		      avail_out.insert(make_pair(&I,0));
@@ -472,16 +467,25 @@ namespace {
 		      safe_out.insert(make_pair(&I,0));
 
 		      //only the first instruction in a basic block can have multiple predecessors
-		      Instruction *inst = (Instruction*) B.getFirstNonPHI();
+		      //Instruction *inst = (Instruction*) B.getFirstNonPHI();
 
 	      }
       }
 
-      availPass(F);
-      antPass(F);
-      safetyPass(F);
-      spavPass(F);
-      spantPass(F);
+      inst *expr;
+      expr = insts;
+
+      while(expr != NULL) {
+        availPass(F, expr);
+        antPass(F, expr);
+        safetyPass(F, expr);
+        spavPass(F, expr);
+        spantPass(F, expr);
+
+        showResults(expr);
+
+        expr = expr->next;
+      }
 
       return false;
 
