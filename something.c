@@ -7,15 +7,16 @@ int main() {
 
 	if(a > 5) {
 		a = a + b;
-		c = b + a;
+		c = b - a;
 	}
 
 	else {
 		int d = a + b;
-		int e = a + c;
+		int e = a - c;
 	}
 
-	b = c + a;
+	b = c - a;
+
 
 	return 0;
 }

@@ -64,9 +64,10 @@ namespace {
       //return false;
       for(auto& B : F) {
 	      for(auto& I : B) {
-		      errs()<< I.getOpcode() <<"\n";
+
 		      if(auto* op = dyn_cast<BinaryOperator>(&I)) {
-			      /*IRBuilder<> builder(op);
+            errs()<<I.getOpcode() <<"\n";
+			      /*IRBuider<> builder(op);
 			      Value *lhs = op->getOperand(0);
 			      Value *rhs = op->getOperand(1);
 			      Value *mul = builder.CreateAdd(lhs, rhs);
@@ -77,14 +78,7 @@ namespace {
 
 
 		      }
-		      if(I.getOpcode() == 11) {//add
-			      Instruction *lhs = (Instruction*) I.getOperand(0); //I is add
-			      Instruction *lload = (Instruction*) lhs->getOperand(0); //lhs is load
-			      errs() << (*lload) << " is the variable\n";
-			      addToInsts(&I);
-		      }
-		      if(I.getOpcode() == 30) { //load
-		      }
+
 
 
 

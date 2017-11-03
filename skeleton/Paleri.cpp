@@ -18,8 +18,8 @@ namespace {
     SkeletonPass() : FunctionPass(ID) {}
 
     struct inst {
-      Instruction *instruction;
-	    Instruction *lhs;
+      int opCode;
+      Instruction *lhs;
 	    Instruction *rhs;
 	    struct inst* next;
     };
@@ -50,7 +50,7 @@ namespace {
 	   //errs()<< *lvar << " is the left variable\n";
 	   if(insts == NULL) {
 		   insts = new inst;
-       insts->instruction = I;
+       insts->opCode=I->getOpcode();
 		   insts->lhs = lvar;
 		   insts->rhs = rvar;
 		   insts->next = NULL;
@@ -62,8 +62,8 @@ namespace {
 		   }
 		   ptr->next = new inst;
 		   ptr = ptr->next;
-       ptr->instruction = I;
-		   ptr->lhs = lvar;
+       ptr->opCode=I->getOpcode();
+       ptr->lhs = lvar;
 		   ptr->rhs = rvar;
 		   ptr->next = NULL;
 	   }
@@ -472,7 +472,27 @@ namespace {
   }
 
     void showResults(inst *expr) {
-      errs() << "\n\n\nExpression : " << getVariable(expr->lhs) << " + " << getVariable(expr->rhs) << "\n";
+      char op;
+      switch(expr->opCode)
+      {
+        case 11: op='+';
+                 break;
+        case 13: op='-';
+                 break;
+        case 15: op='*';
+                 break;
+        case 18: op='/';
+                 break;
+        case 21: op='%';
+                 break;
+        case 26: op='|';
+                 break;
+        case 27: op='&';
+                 break;
+        default: op='#';
+                 break;
+      }
+      errs() << "\n\n\nExpression : " << getVariable(expr->lhs) << " " << op << " " << getVariable(expr->rhs) << "\n";
       errs() << "\nOrder : AVIN, AVOUT, ANTIN, ANTOUT, SAFEIN, SAFEOUT, SPAVIN, SPAVOUT, SPANTIN, SPANTOUT\n\n";
       for(numInstr::iterator it = numToInstr.begin(), ite = numToInstr.end(); it != ite; it++) {
         Instruction *I;
@@ -513,8 +533,8 @@ namespace {
 	      //Instruction *I = (Instruction*) B.getFirstNonPHI();
 	      //errs()<< (*I) << "is the first instruction\n";
 	      for(auto& I : B) {
-
-		      if(I.getOpcode() == 11) {
+          //opCode add =11, sub= 13, multiply= 15, div = 18, percent = 21, bitwiseAnd = 26, bitwiseOr =27
+		      if(I.getOpcode() == 11||I.getOpcode() == 13||I.getOpcode() == 15||I.getOpcode() == 18||I.getOpcode() == 21||I.getOpcode() == 26||I.getOpcode() == 27) {
             inst *expr;
             expr = insts;
             int c = 0;
@@ -523,10 +543,9 @@ namespace {
 
               Instruction *lhsTest = (Instruction*)I.getOperand(0);
               Instruction *rhsTest = (Instruction*)I.getOperand(1);
-
               Instruction *lvarTest = (Instruction*)lhsTest->getOperand(0);
               Instruction *rvarTest = (Instruction*)rhsTest->getOperand(0);
-              if((lvarTest==expr->lhs&&rvarTest==expr->rhs)||(rvarTest==expr->lhs&&lvarTest==expr->rhs)) {
+              if(lvarTest==expr->lhs&&rvarTest==expr->rhs&&expr->opCode==I.getOpcode()) {
                 c = 1;
               }
               expr = expr->next;

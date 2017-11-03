@@ -3,7 +3,7 @@ add_library(SkeletonPass MODULE
     #Skeleton.cpp
     # Available.cpp
     #Try.cpp
-    BBlock.cpp
+    Paleri.cpp
 )
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).
