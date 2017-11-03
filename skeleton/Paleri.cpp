@@ -8,6 +8,7 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Constants.h"
 #include <map>
+#include <string>
 #include <iterator>
 #include <list>
 using namespace llvm;
@@ -28,14 +29,28 @@ namespace {
     struct inst* insts;
 
     //takes an alloc of the form %a = alloca .. and gets a
-    char getVariable(Instruction *I) {
+    std::string getVariable(Instruction *I) {
   	   std::string str;
+       char vName[20];
+       if(ConstantInt *constInt = dyn_cast<ConstantInt> (I)) { //if operand is a constant
+      		int val = constInt->getSExtValue();
+          str = std::to_string(val);
+          return str;
+       }
+
   	   llvm::raw_string_ostream rso(str);
   	   I->print(rso);
   	   char var;
-  	   int i;
+  	   int i,n;
   	   for(i=0; str[i]!='%';i++);
-  	   return str[i+1];
+       i++;
+       n = i;
+       for(;str[i]!=' ';i++) {
+         vName[i-n] = str[i];
+       }
+       vName[i-n] = '\0';
+       std::string str1(vName);
+  	   return str1;
     }
 
 
@@ -44,16 +59,23 @@ namespace {
 	   //errs()<< *(I->getOperand(0)) << " is the lhs\n";
 	   Instruction *lhs = (Instruction*)I->getOperand(0); //of the form %2= load ...
 	   Instruction *rhs = (Instruction*)I->getOperand(1); //we need to get load operand
-	   errs() << "The operands are " << *(lhs) << " and " << *(rhs) << "\n";
-	   if(ConstantInt *constInt = dyn_cast<ConstantInt> (rhs)) {
-		errs() << "The second operand is a constant\n";
-		int val = constInt->getSExtValue();
-		errs() << "And its value is " << val << "\n";
-	   }
-	   return;
 
-	   Instruction *lvar = (Instruction*)lhs->getOperand(0);
-	   Instruction *rvar = (Instruction*)rhs->getOperand(0);
+	   Instruction *lvar;
+     Instruction *rvar;
+     if(ConstantInt *constInt = dyn_cast<ConstantInt> (lhs)) { //if first operand is a constant
+        lvar = lhs;
+    		//int val = constInt->getSExtValue();
+    		//errs() << "And its value is " << val << "\n";
+     }
+     else {
+       lvar = (Instruction*)lhs->getOperand(0);
+     }
+     if(ConstantInt *constInt = dyn_cast<ConstantInt> (rhs)) { //if second operand is a constant
+        rvar = rhs;
+     }
+     else {
+       rvar = (Instruction*)rhs->getOperand(0);
+     }
 	   //the above is of the form %a = alloca
 	   //errs()<< *lvar << " is the left variable\n";
 	   if(insts == NULL) {
@@ -81,34 +103,44 @@ namespace {
    //check if the expression is computed within the node without modifying any of its operands
 
    bool comp(Instruction *i, inst* expr) {
-	if(i->getOpcode() != 11) {
-		return false;
-	}
+     if(i->getOpcode() != 11&&i->getOpcode() != 13&&i->getOpcode() != 15&&i->getOpcode() != 18&&i->getOpcode() != 21&&i->getOpcode() != 26&&i->getOpcode() != 27) {
+       return false;
+     }
 
-	Instruction *lhs = (Instruction*) i->getOperand(0);
-	Instruction *rhs = (Instruction*) i->getOperand(1);
+     Instruction *lhs = (Instruction*)i->getOperand(0); //of the form %2= load ...
+     Instruction *rhs = (Instruction*)i->getOperand(1); //we need to get load operand
 
-	Instruction *lvar = (Instruction*)lhs->getOperand(0);
-	Instruction *rvar = (Instruction*)rhs->getOperand(0);
+     Instruction *lvar;
+     Instruction *rvar;
+     if(ConstantInt *constInt = dyn_cast<ConstantInt> (lhs)) { //if first operand is a constant
+        lvar = lhs;
+     }
+     else {
+       lvar = (Instruction*)lhs->getOperand(0);
+     }
+     if(ConstantInt *constInt = dyn_cast<ConstantInt> (rhs)) { //if second operand is a constant
+        rvar = rhs;
+     }
+     else {
+       rvar = (Instruction*)rhs->getOperand(0);
+     }
 
 
-	//we've got the operands. If they match, it is locally anticipable, but we need to check if they are being modified
-	if(expr->lhs == lvar && expr->rhs == rvar) {
-		//check what the next instruction is storing
-		i = i->getNextNode();
-		Instruction *storedvar = (Instruction*) i->getOperand(1);
-		if(storedvar == lvar || storedvar == rvar) {
-			return false;
-		}
-		return true;
-	}
-
-
+    	//we've got the operands. If they match, it is locally anticipable, but we need to check if they are being modified
+    	if(expr->lhs == lvar && expr->rhs == rvar) {
+    		//check what the next instruction is storing
+    		i = i->getNextNode();
+    		Instruction *storedvar = (Instruction*) i->getOperand(1);
+    		if(storedvar == lvar || storedvar == rvar) {
+    			return false;
+    		}
+    		return true;
+    	}
 
    }
 
    bool transp(Instruction *i, inst *expr) {
-     if(i->getOpcode() != 11) {
+     if(i->getOpcode() != 11&&i->getOpcode() != 13&&i->getOpcode() != 15&&i->getOpcode() != 18&&i->getOpcode() != 21&&i->getOpcode() != 26&&i->getOpcode() != 27) {
    		return true;
    	}
 
@@ -136,8 +168,20 @@ namespace {
      Instruction *lhs = (Instruction*) i->getOperand(0);
      Instruction *rhs = (Instruction*) i->getOperand(1);
 
-     Instruction *lvar = (Instruction*)lhs->getOperand(0);
-     Instruction *rvar = (Instruction*)rhs->getOperand(0);
+     Instruction *lvar;
+     Instruction *rvar;
+     if(ConstantInt *constInt = dyn_cast<ConstantInt> (lhs)) { //if first operand is a constant
+        lvar = lhs;
+     }
+     else {
+       lvar = (Instruction*)lhs->getOperand(0);
+     }
+     if(ConstantInt *constInt = dyn_cast<ConstantInt> (rhs)) { //if second operand is a constant
+        rvar = rhs;
+     }
+     else {
+       rvar = (Instruction*)rhs->getOperand(0);
+     }
 
 
      //we've got the operands. If they match, it is locally anticipable
@@ -514,7 +558,7 @@ namespace {
   			errs() << (**i) << "\n";
   		}
 
-      errs() << "\nThe edges to be considered for insertion are those between\n";
+      errs() << "\nThe edges to be considered for insertion are those between:\n";
   		for(edge::iterator i=insertedges.begin(), ie=insertedges.end(); i!=ie; i++) {
   			errs() << *(i->first) << " and " << *(i->second) << "\n";
   		}
@@ -542,20 +586,29 @@ namespace {
 	      //errs()<< (*I) << "is the first instruction\n";
 	      for(auto& I : B) {
           //opCode add =11, sub= 13, multiply= 15, div = 18, percent = 21, bitwiseAnd = 26, bitwiseOr =27
+
 		      if(I.getOpcode() == 11||I.getOpcode() == 13||I.getOpcode() == 15||I.getOpcode() == 18||I.getOpcode() == 21||I.getOpcode() == 26||I.getOpcode() == 27) {
             inst *expr;
             expr = insts;
             int c = 0;
-                  //checking duplicates and commutativity
+            //checking duplicates and commutativity
             while(expr != NULL) {
-
               Instruction *lhsTest = (Instruction*)I.getOperand(0);
               Instruction *rhsTest = (Instruction*)I.getOperand(1);
-
-		errs() << "The left operand is " << *(lhsTest) << "\n";
-		return false;
-              Instruction *lvarTest = (Instruction*)lhsTest->getOperand(0);
-              Instruction *rvarTest = (Instruction*)rhsTest->getOperand(0);
+              Instruction *lvarTest;
+              Instruction *rvarTest;
+              if(ConstantInt *constInt = dyn_cast<ConstantInt> (lhsTest)) { //if first operand is a constant
+                 lvarTest = lhsTest;
+              }
+              else {
+                lvarTest = (Instruction*)lhsTest->getOperand(0);
+              }
+              if(ConstantInt *constInt = dyn_cast<ConstantInt> (rhsTest)) { //if second operand is a constant
+                 rvarTest = rhsTest;
+              }
+              else {
+                rvarTest = (Instruction*)rhsTest->getOperand(0);
+              }
               if(lvarTest==expr->lhs&&rvarTest==expr->rhs&&expr->opCode==I.getOpcode()) {
                 c = 1;
               }
