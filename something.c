@@ -3,20 +3,13 @@
 int main() {
 	int a = 5;
 	int b = 10;
-	int c = a + b;
-
-	if(a > 5) {
-		a = a + b;
-		c = b - a;
+	int p,d,e,c,x;
+	c = a + b;
+	for(p=0; p<a; p++){
+		c = a + b;
+		d = b - a;
+		e = c - a;
 	}
-
-	else {
-		int d = a + b;
-		int e = a - c;
-	}
-
-	b = c - a;
-
 
 	return 0;
 }
