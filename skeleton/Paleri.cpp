@@ -102,9 +102,9 @@ namespace {
 
    //check if the expression is computed within the node without modifying any of its operands
 
-   bool comp(Instruction *i, inst* expr) {
-     if(i->getOpcode() != 11&&i->getOpcode() != 13&&i->getOpcode() != 15&&i->getOpcode() != 18&&i->getOpcode() != 21&&i->getOpcode() != 26&&i->getOpcode() != 27) {
-       return false;
+   int comp(Instruction *i, inst* expr) {
+     if(i->getOpcode() != 11 && i->getOpcode() != 13 && i->getOpcode() != 15 && i->getOpcode() != 18 && i->getOpcode() != 21 && i->getOpcode() != 26 && i->getOpcode() != 27) {
+       return 0;
      }
 
      Instruction *lhs = (Instruction*)i->getOperand(0); //of the form %2= load ...
@@ -132,16 +132,19 @@ namespace {
     		i = i->getNextNode();
     		Instruction *storedvar = (Instruction*) i->getOperand(1);
     		if(storedvar == lvar || storedvar == rvar) {
-    			return false;
+    			return 0;
     		}
-    		return true;
+
+        return 1;
     	}
+
+      return 0;
 
    }
 
-   bool transp(Instruction *i, inst *expr) {
-     if(i->getOpcode() != 11&&i->getOpcode() != 13&&i->getOpcode() != 15&&i->getOpcode() != 18&&i->getOpcode() != 21&&i->getOpcode() != 26&&i->getOpcode() != 27) {
-   		return true;
+   int transp(Instruction *i, inst *expr) {
+     if(i->getOpcode() != 11 && i->getOpcode() != 13 && i->getOpcode() != 15 && i->getOpcode() != 18 && i->getOpcode() != 21 && i->getOpcode() != 26 && i->getOpcode() != 27) {
+   		return 1;
    	}
 
 
@@ -154,15 +157,15 @@ namespace {
     Instruction *storedvar = (Instruction*) i->getOperand(1);
     //errs() << "The stored var  is " << (*storedvar) << "\n";
     if(storedvar == lvar || storedvar == rvar) {
-      return false;
+      return 0;
     }
 
-    return true;
+    return 1;
    }
 
-   bool antloc(Instruction *i, inst *expr) {
-     if(i->getOpcode() != 11) {  //if no computation => expression not anticipated.
-       return false;
+   int antloc(Instruction *i, inst *expr) {
+     if(i->getOpcode() != 11 && i->getOpcode() != 13 && i->getOpcode() != 15 && i->getOpcode() != 18 && i->getOpcode() != 21 && i->getOpcode() != 26 && i->getOpcode() != 27) {  //if no computation => expression not anticipated.
+       return 0;
      }
 
      Instruction *lhs = (Instruction*) i->getOperand(0);
@@ -172,12 +175,14 @@ namespace {
      Instruction *rvar;
      if(ConstantInt *constInt = dyn_cast<ConstantInt> (lhs)) { //if first operand is a constant
         lvar = lhs;
+        //errs() << "The lvar is " << *lvar << "\n";
      }
      else {
        lvar = (Instruction*)lhs->getOperand(0);
      }
      if(ConstantInt *constInt = dyn_cast<ConstantInt> (rhs)) { //if second operand is a constant
         rvar = rhs;
+        //errs() << "The rvar is " << *rvar << "\n";
      }
      else {
        rvar = (Instruction*)rhs->getOperand(0);
@@ -185,11 +190,13 @@ namespace {
 
 
      //we've got the operands. If they match, it is locally anticipable
+
      if(expr->lhs == lvar && expr->rhs == rvar) {
-       return true;
+       //errs() << *lvar << " " << *rvar << " " << *expr->lhs << " " << *expr->rhs << "\n";
+       return 1;
      }
 
-     return false;
+     return 0;
    }
 
 
@@ -616,25 +623,30 @@ namespace {
 	 void calculateInsertEdges(Function &F, inst *expr) {
   		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
   			BasicBlock *B = (BasicBlock*) b;
+        errs() << "The first inst is " << *(B->begin()) << "numsucc of b is" << B->getTerminator()->getNumSuccessors() << "\n";
   			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
   				Instruction *I = (Instruction*) i;
-
   				if(I == B->getTerminator()) {
   				     TerminatorInst *TInst = B->getTerminator();
-  			            for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
-  				                BasicBlock *Succ = TInst->getSuccessor(x);
-  			              	        Instruction *J = (Instruction*) Succ->begin();
-  						if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
-  							insertedges[I] = J;
-  							insertedges[I] = J;
-  						}
-  					}
+  			       for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
+  				        BasicBlock *Succ = TInst->getSuccessor(x);
+  			          Instruction *J = (Instruction*) Succ->begin();
+                  errs() << "The instruction following " << *TInst << " is " << *J << "and the numsucc is " << NSucc <<  "\n";
+                  errs() << spav_out[I] << spav_in[J] << spant_in[J] << "\n";
+      						if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
+      							insertedges[I] = J;
+      							//insertedges[I] = J;
+                    errs () << "We found a point of edge insertion";
+
+      						}
+  					   }
   				}
 
   				else {
   					Instruction* J = (Instruction*) ++i;
   					if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
   						insertedges[I] = J;
+              errs () << "We found a point of edge insertion";
   					}
   				}
   			}
@@ -680,12 +692,12 @@ namespace {
                  break;
       }
       errs() << "\n\n\nExpression : " << getVariable(expr->lhs) << " " << op << " " << getVariable(expr->rhs) << "\n";
-      errs() << "\nOrder : AVIN, AVOUT, ANTIN, ANTOUT, SAFEIN, SAFEOUT, SPAVIN, SPAVOUT, SPANTIN, SPANTOUT\n\n";
+      errs() << "\nOrder : AVIN, AVOUT, ANTIN, ANTOUT, SAFEIN, SAFEOUT, SPAVIN, SPAVOUT, SPANTIN, SPANTOUT, ANTLOC, COMP, TRANSP\n\n";
       for(numInstr::iterator it = numToInstr.begin(), ite = numToInstr.end(); it != ite; it++) {
         Instruction *I;
         I = it->second;
         errs() << "-" << *I << "\t=> " << avail_in[I] << " " << avail_out[I] << " " << ant_in[I] << " " << ant_out[I] << " " << safe_in[I] << " " << safe_out[I] << " " << spav_in[I] << " "
-        << spav_out[I] << " " << spant_in[I] << " " << spant_out[I] << "\n\n";
+        << spav_out[I] << " " << spant_in[I] << " " << spant_out[I] << " " << antloc(I, expr) << " " << comp(I, expr) << " " << transp(I, expr) << "\n\n";
       }
 
       errs() << "\nThe points of insertion are:\n";
