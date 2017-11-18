@@ -131,6 +131,7 @@ namespace {
     		//check what the next instruction is storing
     		i = i->getNextNode();
     		Instruction *storedvar = (Instruction*) i->getOperand(1);
+        //errs() << "Opcode of store is " << i->getOpcode() << "\n";
     		if(storedvar == lvar || storedvar == rvar) {
     			return 0;
     		}
@@ -142,7 +143,7 @@ namespace {
 
    }
 
-   int transp(Instruction *i, inst *expr) {
+    int transp(Instruction *i, inst *expr) {
      if(i->getOpcode() != 11 && i->getOpcode() != 13 && i->getOpcode() != 15 && i->getOpcode() != 18 && i->getOpcode() != 21 && i->getOpcode() != 26 && i->getOpcode() != 27) {
    		return 1;
    	}
@@ -606,7 +607,7 @@ namespace {
 
     }
 
-  void calculateInsertNodes(Function &F, inst *expr) {
+  void findInsertNodes(Function &F, inst *expr) {
 		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
 			BasicBlock *B = (BasicBlock*) b;
 			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
@@ -620,21 +621,26 @@ namespace {
 
 	 }
 
-	 void calculateInsertEdges(Function &F, inst *expr) {
+	 void findInsertEdges(Function &F, inst *expr) {
   		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
   			BasicBlock *B = (BasicBlock*) b;
-        errs() << "The first inst is " << *(B->begin()) << "numsucc of b is" << B->getTerminator()->getNumSuccessors() << "\n";
+        //errs() << "The first inst is " << *(B->begin()) << "numsucc of b is" << B->getTerminator()->getNumSuccessors() << "\n";
   			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
   				Instruction *I = (Instruction*) i;
+          errs() << *I << "\n";
   				if(I == B->getTerminator()) {
   				     TerminatorInst *TInst = B->getTerminator();
   			       for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
   				        BasicBlock *Succ = TInst->getSuccessor(x);
   			          Instruction *J = (Instruction*) Succ->begin();
-                  errs() << "The instruction following " << *TInst << " is " << *J << "and the numsucc is " << NSucc <<  "\n";
-                  errs() << spav_out[I] << spav_in[J] << spant_in[J] << "\n";
+                  //errs() << "The instruction following " << *TInst << " is " << *J << "and the numsucc is " << NSucc <<  "\n";
+                  //errs() << spav_out[I] << spav_in[J] << spant_in[J] << "\n";
+                  //The last instruction is br, so we need to insert just before it
       						if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
-      							insertedges[I] = J;
+                    BasicBlock::iterator prev = i;
+                    prev--;
+                    Instruction* PrevInst = (Instruction*) prev;
+      							insertedges[PrevInst] = I;
       							//insertedges[I] = J;
                     errs () << "We found a point of edge insertion";
 
@@ -643,7 +649,8 @@ namespace {
   				}
 
   				else {
-  					Instruction* J = (Instruction*) ++i;
+  					Instruction* J = (Instruction*) i;
+            J++;
   					if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
   						insertedges[I] = J;
               errs () << "We found a point of edge insertion";
@@ -657,7 +664,7 @@ namespace {
   		}*/
 	 }
 
-	void calculateReplaceNodes(Function &F, inst *expr) {
+	void findReplaceNodes(Function &F, inst *expr) {
 		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
 			BasicBlock *B = (BasicBlock*) b;
 			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
@@ -798,9 +805,9 @@ namespace {
 
         } while(change == 1);
 
-        calculateInsertNodes(F, expr);
-        calculateInsertEdges(F, expr);
-        calculateReplaceNodes(F, expr);
+        findInsertNodes(F, expr);
+        findInsertEdges(F, expr);
+        findReplaceNodes(F, expr);
 
         showResults(expr);
 
