@@ -145,6 +145,13 @@ namespace {
 
     int transp(Instruction *i, inst *expr) {
      if(i->getOpcode() != 11 && i->getOpcode() != 13 && i->getOpcode() != 15 && i->getOpcode() != 18 && i->getOpcode() != 21 && i->getOpcode() != 26 && i->getOpcode() != 27) {
+       if(i->getOpcode() == 31) {
+         Instruction *storedvar = (Instruction*) i->getOperand(1);
+         if(storedvar == expr->lhs || storedvar == expr->rhs) {
+           return 0;
+         }
+       }
+
    		return 1;
    	}
 
