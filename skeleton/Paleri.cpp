@@ -11,6 +11,7 @@
 #include <string>
 #include <iterator>
 #include <list>
+#include <algorithm>
 using namespace llvm;
 using namespace std;
 
@@ -56,7 +57,7 @@ namespace {
 
 
    void addToInsts(Instruction *I) {
-	   //errs()<< *(I->getOperand(0)) << " is the lhs\n";
+
 	   Instruction *lhs = (Instruction*)I->getOperand(0); //of the form %2= load ...
 	   Instruction *rhs = (Instruction*)I->getOperand(1); //we need to get load operand
 
@@ -65,7 +66,7 @@ namespace {
      if(ConstantInt *constInt = dyn_cast<ConstantInt> (lhs)) { //if first operand is a constant
         lvar = lhs;
     		//int val = constInt->getSExtValue();
-    		//errs() << "And its value is " << val << "\n";
+
      }
      else {
        lvar = (Instruction*)lhs->getOperand(0);
@@ -77,7 +78,7 @@ namespace {
        rvar = (Instruction*)rhs->getOperand(0);
      }
 	   //the above is of the form %a = alloca
-	   //errs()<< *lvar << " is the left variable\n";
+
 	   if(insts == NULL) {
 		   insts = new inst;
        insts->opCode=I->getOpcode();
@@ -131,7 +132,7 @@ namespace {
     		//check what the next instruction is storing
     		i = i->getNextNode();
     		Instruction *storedvar = (Instruction*) i->getOperand(1);
-        //errs() << "Opcode of store is " << i->getOpcode() << "\n";
+
     		if(storedvar == lvar || storedvar == rvar) {
     			return 0;
     		}
@@ -161,9 +162,9 @@ namespace {
 
 
     i = i->getNextNode();
-    //errs() << "The store is " << (*i) << "\n";
+
     Instruction *storedvar = (Instruction*) i->getOperand(1);
-    //errs() << "The stored var  is " << (*storedvar) << "\n";
+
     if(storedvar == lvar || storedvar == rvar) {
       return 0;
     }
@@ -183,14 +184,14 @@ namespace {
      Instruction *rvar;
      if(ConstantInt *constInt = dyn_cast<ConstantInt> (lhs)) { //if first operand is a constant
         lvar = lhs;
-        //errs() << "The lvar is " << *lvar << "\n";
+
      }
      else {
        lvar = (Instruction*)lhs->getOperand(0);
      }
      if(ConstantInt *constInt = dyn_cast<ConstantInt> (rhs)) { //if second operand is a constant
         rvar = rhs;
-        //errs() << "The rvar is " << *rvar << "\n";
+
      }
      else {
        rvar = (Instruction*)rhs->getOperand(0);
@@ -200,7 +201,7 @@ namespace {
      //we've got the operands. If they match, it is locally anticipable
 
      if(expr->lhs == lvar && expr->rhs == rvar) {
-       //errs() << *lvar << " " << *rvar << " " << *expr->lhs << " " << *expr->rhs << "\n";
+
        return 1;
      }
 
@@ -237,6 +238,8 @@ namespace {
     edge insertedges;
 
     list<Instruction*> replacenodes;
+
+    list<Instruction*> exitnodes;
 
     int change = 0;
 
@@ -315,13 +318,13 @@ namespace {
       int prev;
 
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
-	      //BasicBlock *B = (BasicBlock*)  b;
-	      //errs() << "The last instruction is " << (*--B->end()) << "\n";
+
+
 	      BasicBlock *B = (BasicBlock*) b;
 	      for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
 		      Instruction *I = (Instruction*) i;
 		      if(b==F.begin() && i==B->begin()) {
-			      //errs() << I << " " << (*I) << "\n";
+
             prev = avail_in[I];
 			      avail_in[I] = 0;
             if(prev != avail_in[I]) {
@@ -358,10 +361,6 @@ namespace {
             }
 		      }
 		      else {
-			      //avail_in[I] = avail_out[--I];
-			      /*while((Instruction*) j != I) {
-				      j++;
-			      }*/
 
 			      BasicBlock::iterator j = i;
 			      j--;
@@ -377,9 +376,7 @@ namespace {
             if(prev != avail_out[I]) {
               change = 1;
             }
-          /*  if(I->getOpcode()==11) {
-              errs() << (*I) << "Transp " << transp(I, insts) << "comp " << comp(I, insts)<<"\n";
-            }*/
+
 		      }
 	      }
       }
@@ -428,13 +425,13 @@ namespace {
       int prev;
 
       for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
-	      //BasicBlock *B = (BasicBlock*)  b;
-	      //errs() << "The last instruction is " << (*--B->end()) << "\n";
+
+
 	      BasicBlock *B = (BasicBlock*) b;
 	      for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
 		      Instruction *I = (Instruction*) i;
 		      if(b==F.begin() && i==B->begin()) {
-			      //errs() << I << " " << (*I) << "\n";
+
             prev = spav_in[I];
 			      spav_in[I] = 0;
             if(prev != spav_in[I]) {
@@ -490,10 +487,10 @@ namespace {
             }
 		      }
 		      else {
-			      //avail_in[I] = avail_out[--I];
-			      /*while((Instruction*) j != I) {
-				      j++;
-			      }*/
+
+
+
+
             prev = spav_in[I];
 			      if(safe_in[I] == 0) {
 				      spav_in[I] = 0;
@@ -631,25 +628,25 @@ namespace {
 	 void findInsertEdges(Function &F, inst *expr) {
   		for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
   			BasicBlock *B = (BasicBlock*) b;
-        //errs() << "The first inst is " << *(B->begin()) << "numsucc of b is" << B->getTerminator()->getNumSuccessors() << "\n";
+
   			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
   				Instruction *I = (Instruction*) i;
-          errs() << *I << "\n";
+
   				if(I == B->getTerminator()) {
   				     TerminatorInst *TInst = B->getTerminator();
   			       for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
   				        BasicBlock *Succ = TInst->getSuccessor(x);
   			          Instruction *J = (Instruction*) Succ->begin();
-                  //errs() << "The instruction following " << *TInst << " is " << *J << "and the numsucc is " << NSucc <<  "\n";
-                  //errs() << spav_out[I] << spav_in[J] << spant_in[J] << "\n";
+
+
                   //The last instruction is br, so we need to insert just before it
       						if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
                     BasicBlock::iterator prev = i;
                     prev--;
                     Instruction* PrevInst = (Instruction*) prev;
       							insertedges[PrevInst] = I;
-      							//insertedges[I] = J;
-                    errs () << "We found a point of edge insertion";
+
+
 
       						}
   					   }
@@ -660,15 +657,15 @@ namespace {
             J++;
   					if(!(spav_out[I]) && spav_in[J] && spant_in[J]) {
   						insertedges[I] = J;
-              errs () << "We found a point of edge insertion";
+
   					}
   				}
   			}
   		}
 
-  		/*for(list<Instruction*, Instruction*>::iterator i=insertedges.begin(); i!=insertedges.end(); i++) {
-  			errs() << *(i->first) << " and " << *(i->second) << "\n";
-  		}*/
+
+
+
 	 }
 
 	void findReplaceNodes(Function &F, inst *expr) {
@@ -683,6 +680,37 @@ namespace {
 		}
 
   }
+
+/*  void reduceInserts(Function &F, inst *expr) {
+    for(Function::iterator b=F.begin(), be=F.end(); b!=be; b++) {
+      BasicBlock *B = (BasicBlock*) b;
+			for(BasicBlock::iterator i=B->begin(), ie=B->end(); i!=ie; i++) {
+				Instruction *I = (Instruction*) i;
+        if(I == B->getTerminator()) {
+             bool exitInsert = true;
+             TerminatorInst *TInst = B->getTerminator();
+             for (unsigned x = 0, NSucc = TInst->getNumSuccessors(); x < NSucc; ++x) {
+                BasicBlock *Succ = TInst->getSuccessor(x);
+                Instruction *J = (Instruction*) Succ->begin();
+
+                int numPred = 0;
+                for (auto it = pred_begin(Succ), et = pred_end(Succ); it != et; ++it) {
+                  numPred++;
+                }
+
+                if(!((insertedges[I] == J) || (numPred == 1 && (std::find(std::begin(insertnodes), std::end(insertnodes), J) != std::end(insertnodes))))) {
+                  exitInsert = false;
+                }
+             }
+
+             if(exitInsert) {
+               exitnodes.push_back(I);
+
+             }
+        }
+			}
+    }
+  }*/
 
     void showResults(inst *expr) {
       char op;
@@ -733,18 +761,16 @@ namespace {
 
 
     virtual bool runOnFunction(Function &F) {
-      errs() << "I saw a function called " << F.getName() << "!\n";
+      errs() << "Function " << F.getName() << "\n";
       F.dump();
       insts = NULL;
 
       int num = 0;
 
       for(auto& B : F) {
-	      errs()<< "I saw a basic block\n";
-	      Instruction  *TInst = (Instruction*) B.getTerminator();
-	      //errs()<< (*TInst) << "is the terminator\n";
+
 	      //Instruction *I = (Instruction*) B.getFirstNonPHI();
-	      //errs()<< (*I) << "is the first instruction\n";
+
 	      for(auto& I : B) {
           //opCode add =11, sub= 13, multiply= 15, div = 18, percent = 21, bitwiseAnd = 26, bitwiseOr =27
 
