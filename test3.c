@@ -6,13 +6,13 @@ int main() {
 	int d,c;
 
 	if(a < b) {
-		c = a + b;
+		a = a + b;
 	}
 	else {
 		d = a + b;
 	}
 
-	d = a + b;
+	c = a + b;
 
 	return 0;
 }

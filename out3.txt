@@ -19,7 +19,7 @@ define i32 @main() #0 {
   %6 = load i32, i32* %a, align 4
   %7 = load i32, i32* %b, align 4
   %8 = add nsw i32 %6, %7
-  store i32 %8, i32* %c, align 4
+  store i32 %8, i32* %a, align 4
   br label %13
 
 ; <label>:9                                       ; preds = %0
@@ -33,7 +33,7 @@ define i32 @main() #0 {
   %14 = load i32, i32* %a, align 4
   %15 = load i32, i32* %b, align 4
   %16 = add nsw i32 %14, %15
-  store i32 %16, i32* %d, align 4
+  store i32 %16, i32* %c, align 4
   ret i32 0
 }
 
@@ -72,11 +72,11 @@ Order : AVIN, AVOUT, ANTIN, ANTOUT, SAFEIN, SAFEOUT, SPAVIN, SPAVOUT, SPANTIN, S
 
 -  %7 = load i32, i32* %b, align 4	=> 0 0 1 1 1 1 0 0 1 1 0 0 1
 
--  %8 = add nsw i32 %6, %7	=> 0 1 1 1 1 1 0 1 1 1 1 1 1
+-  %8 = add nsw i32 %6, %7	=> 0 0 1 0 1 0 0 0 1 0 1 0 0
 
--  store i32 %8, i32* %c, align 4	=> 1 1 1 1 1 1 1 1 1 1 0 0 1
+-  store i32 %8, i32* %a, align 4	=> 0 0 0 1 0 1 0 0 0 1 0 0 0
 
--  br label %13	=> 1 1 1 1 1 1 1 1 1 1 0 0 1
+-  br label %13	=> 0 0 1 1 1 1 0 0 1 1 0 0 1
 
 -  %10 = load i32, i32* %a, align 4	=> 0 0 1 1 1 1 0 0 1 1 0 0 1
 
@@ -88,24 +88,23 @@ Order : AVIN, AVOUT, ANTIN, ANTOUT, SAFEIN, SAFEOUT, SPAVIN, SPAVOUT, SPANTIN, S
 
 -  br label %13	=> 1 1 1 1 1 1 1 1 1 1 0 0 1
 
--  %14 = load i32, i32* %a, align 4	=> 1 1 1 1 1 1 1 1 1 1 0 0 1
+-  %14 = load i32, i32* %a, align 4	=> 0 0 1 1 1 1 1 1 1 1 0 0 1
 
--  %15 = load i32, i32* %b, align 4	=> 1 1 1 1 1 1 1 1 1 1 0 0 1
+-  %15 = load i32, i32* %b, align 4	=> 0 0 1 1 1 1 1 1 1 1 0 0 1
 
--  %16 = add nsw i32 %14, %15	=> 1 1 1 0 1 1 1 1 1 0 1 1 1
+-  %16 = add nsw i32 %14, %15	=> 0 1 1 0 1 1 1 1 1 0 1 1 1
 
--  store i32 %16, i32* %d, align 4	=> 1 1 0 0 1 1 1 1 0 0 0 0 1
+-  store i32 %16, i32* %c, align 4	=> 1 1 0 0 1 1 1 1 0 0 0 0 1
 
 -  ret i32 0	=> 1 1 0 0 1 1 1 1 0 0 0 0 1
 
 
 The points of insertion are:
-  %8 = add nsw i32 %6, %7
   %12 = add nsw i32 %10, %11
 
 The edges to be considered for insertion are those between:
+  store i32 %8, i32* %a, align 4 and   br label %13
 
 The points of replacement are:
-  %8 = add nsw i32 %6, %7
   %12 = add nsw i32 %10, %11
   %16 = add nsw i32 %14, %15
